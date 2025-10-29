@@ -20,7 +20,7 @@ import PlanSelection from '@/components/PlanSelection';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import { LegalModal } from '@/components/modals/LegalModal';
 import { ProfessionalAccessModal } from '@/components/modals/ProfessionalAccessModal';
-import { FamilyMemberSignupFlow } from '@/components/FamilyMemberSignupFlow';
+// import { FamilyMemberSignupFlow } from '@/components/FamilyMemberSignupFlow';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Mail,
@@ -237,8 +237,13 @@ const AuthPage = () => {
           ? t('auth.choosePlan')
           : t('auth.confirmEmail'),
       });
-    } catch (err: any) {
-      setError(t('auth.registrationError'));
+    } catch (err: unknown) {
+      console.error('Signup error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(t('auth.registrationError'));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -284,77 +289,89 @@ const AuthPage = () => {
     setIsLoading(true);
     setError(null);
 
-    // In test mode, accept any code or auto-generate
-    if (isTestMode) {
-      try {
-        // Generate test patient access code if needed
-        const testCode = familyData.patientCode || 'TEST123';
+    const accessCode = familyData.patientCode?.trim().toUpperCase();
+    const phoneNumber = familyData.phone?.trim();
 
-        // Create a test patient access code in the database
-        const { error: codeError } = await supabase
-          .from('patient_access_codes')
-          .upsert({
-            user_id: user?.id,
-            access_code: testCode,
-            expires_at: new Date(
-              Date.now() + 30 * 24 * 60 * 60 * 1000
-            ).toISOString(), // 30 days
-            is_active: true,
-          });
-
-        if (codeError) {
-          console.log('Code creation error (test mode):', codeError);
-        }
-
-        toast({
-          title: t('authFixes.test_mode.enabled_title'),
-          description: t('authFixes.test_mode.enabled_description'),
-        });
-        navigate('/');
-        return;
-      } catch (err: any) {
-        console.log('Test mode error:', err);
-        // Continue with normal flow in case of error
-      }
+    if (!accessCode || accessCode.length !== 8) {
+      setError('Please enter a valid 8-character access code');
+      setIsLoading(false);
+      return;
     }
 
-    // Normal validation for non-test mode
-    if (!familyData.patientCode || familyData.patientCode.length < 6) {
-      setError(t('auth.invalidPatientCode'));
+    if (!phoneNumber) {
+      setError('Please enter your phone number');
       setIsLoading(false);
       return;
     }
 
     try {
-      // Verify patient code exists and is active
-      const { data: patientCode, error: verifyError } = await supabase
-        .from('patient_access_codes')
-        .select('*')
-        .eq('access_code', familyData.patientCode)
-        .eq('is_active', true)
+      // 1. Find patient by access code
+      const { data: profile, error: profileError } = await supabase
+        .from<{
+          user_id: string;
+          first_name: string;
+          last_name: string;
+          access_code: string;
+        }>('profiles')
+        .select('user_id, first_name, last_name, access_code')
+        .eq('access_code', accessCode)
         .single();
 
-      if (verifyError || !patientCode) {
-        setError(t('auth.invalidOrExpiredCode'));
+      // console.log('profile', profile);
+      if (profileError || !profile) {
+        setError('Invalid access code');
         setIsLoading(false);
         return;
       }
 
-      // Check if code is expired
-      if (new Date() > new Date(patientCode.expires_at)) {
-        setError(t('auth.codeExpired'));
+      // 2. Find family member by phone number for this patient
+      const { data: familyMember, error: familyError } = await supabase
+        .from<{
+          id: string;
+          full_name: string;
+          phone: string;
+          permission_level: string;
+        }>('family_members')
+        .select('id, full_name, phone, permission_level')
+        .eq('patient_user_id', profile.user_id)
+        .eq('phone', phoneNumber)
+        .single();
+
+      // console.log('familyMember', familyMember);
+
+      if (familyError || !familyMember) {
+        setError(
+          'No family access found for this phone number. Please check your number or ask the patient to add you.'
+        );
         setIsLoading(false);
         return;
-      }
+      };
+      
+      // 3. Store session
+      const familySession = {
+        family_member_id: familyMember.id,
+        family_member_name: familyMember.full_name,
+        family_member_phone: familyMember.phone,
+        patient_user_id: profile.user_id,
+        patient_name: `${profile.first_name} ${profile.last_name}`,
+        access_code: accessCode,
+        permission_level: familyMember.permission_level,
+        login_time: new Date().toISOString(),
+      };
+
+      // console.log(familySession);
+
+      localStorage.setItem('family_session', JSON.stringify(familySession));
 
       toast({
-        title: t('auth.familyAccessGranted'),
-        description: t('auth.welcomeFamily'),
+        title: 'Family Access Granted!',
+        description: `Welcome ${familyMember.full_name}! Accessing ${profile.first_name}'s dashboard.`,
       });
 
-      navigate('/');
+      navigate('/family-dashboard');
     } catch (err: any) {
-      setError(t('auth.invalidOrExpiredCode'));
+      console.error('Family login error:', err);
+      setError('Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -379,7 +396,8 @@ const AuthPage = () => {
       });
 
       navigate('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error('Professional login error:', err);
       setError(t('auth.connectionError'));
     } finally {
       setIsLoading(false);
@@ -526,6 +544,7 @@ const AuthPage = () => {
       setIsLoading(false);
     }
   };
+
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 bg-background">
       {/* Language Selector - Top Right */}
@@ -1026,7 +1045,56 @@ const AuthPage = () => {
               </TabsContent>
 
               <TabsContent value="family" className="mt-6">
-                <FamilyMemberSignupFlow />
+                <form onSubmit={handleFamilyAccess} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="patient-code">Patient Access Code</Label>
+                    <Input
+                      id="patient-code"
+                      type="text"
+                      placeholder="Enter the 8-character code"
+                      value={familyData.patientCode}
+                      onChange={e =>
+                        setFamilyData(prev => ({
+                          ...prev,
+                          patientCode: e.target.value.toUpperCase(),
+                        }))
+                      }
+                      className="text-center font-mono text-lg"
+                      maxLength={8}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="family-phone">Your Phone Number</Label>
+                    <Input
+                      id="family-phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={familyData.phone}
+                      onChange={e =>
+                        setFamilyData(prev => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the phone number the patient used when adding you
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={
+                      isLoading || !familyData.patientCode || !familyData.phone
+                    }
+                  >
+                    {isLoading ? 'Logging in...' : 'Login as Family Member'}
+                  </Button>
+                </form>
               </TabsContent>
             </Tabs>
           </CardContent>

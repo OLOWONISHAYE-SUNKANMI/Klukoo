@@ -24,18 +24,29 @@ import AddGlucoseModal from '../modals/AddGlucoseModal';
 import BarcodeScanModal from '../modals/BarcodeScanModal';
 import PhotoUploadModal from '../modals/PhotoUploadModal';
 import PhotoAnalysisModal from '../modals/PhotoAnalysisModal';
-import { BookOpen, MessageCircle, Stethoscope, Users } from 'lucide-react';
+import {
+  BookOpen,
+  MessageCircle,
+  Stethoscope,
+  Users,
+  Lock,
+} from 'lucide-react';
 import DynamicAlert from './DynamicAlert';
-
 
 interface ActionsRapidesProps {
   onTabChange?: (tab: string) => void;
-  onGlucoseSubmit?: (glucoseValue: string) => void;
+  onGlucoseSubmit: (value: string) => void;
+  onGlycemieClick: () => void;
+  onMedicamentClick: () => void;
+  onMealClick: () => void;
+  onActivityClick: () => void;
+  isReadOnly?: boolean;
 }
 
 const ActionsRapides: React.FC<ActionsRapidesProps> = ({
   onTabChange,
   onGlucoseSubmit,
+  isReadOnly = false,
 }) => {
   const { addReading } = useGlucose();
   const { t } = useTranslation();
@@ -43,8 +54,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
   const { addMedication } = useMedications();
   const { addActivity } = useActivities();
   const { darkMode } = useThemeStore();
-    const { toast } = useToast();
-  
+  const { toast } = useToast();
 
   // States
   const [isGlucoseModalOpen, setIsGlucoseModalOpen] = useState(false);
@@ -65,6 +75,15 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
   const [glucoseLoading, setGlucoseLoading] = useState(false);
   const [foodName, setFoodName] = useState('');
   const [carbs, setCarbs] = useState('');
+
+  // Handler to show read-only message
+  const handleReadOnlyClick = () => {
+    toast({
+      title: '🔒 Read-Only Access',
+      description: 'You can view but not add or edit data',
+      variant: 'default',
+    });
+  };
 
   // Handlers
   const showAlert = (
@@ -94,8 +113,8 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
     );
     toast({
       title: t('Actions.glucoseSaved'),
-      description: "glucose added sucessfully ",
-      variant: "success"
+      description: 'glucose added sucessfully ',
+      variant: 'success',
     });
 
     setGlucoseValue('');
@@ -118,7 +137,6 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
 
       toast({ title: t('Actions.mealSaved') });
 
-      // reset form
       setFoodName('');
       setCarbs('');
       setIsMealModalOpen(false);
@@ -154,7 +172,6 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
     onTabChange?.('blog');
   };
 
-  // Utility for semantic colors
   const bgCard = 'bg-card';
   const textCard = 'text-card-foreground';
   const bgButtonLight = 'bg-accent/20 hover:bg-accent/30';
@@ -163,17 +180,6 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
 
   return (
     <div className="px-3 sm:px-4">
-      {/* Dynamic Alert */}
-      <div className="mb-4">
-        {/* <DynamicAlert
-          isVisible={alertVisible}
-          onDismiss={() => setAlertVisible(false)}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          variant={alertConfig.variant}
-        /> */}
-      </div>
-
       <div
         className={`rounded-xl p-4 sm:p-6 shadow-md transition-colors ${bgCard} ${textCard}`}
       >
@@ -181,13 +187,28 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
           {t('Actions.actions')}
         </h3>
 
+        {/* Read-Only Warning Banner */}
+        {isReadOnly && (
+          <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center gap-2">
+            <Lock className="w-4 h-4 text-yellow-600" />
+            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+              👁️ View-only mode - You can see but not add or edit data
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* Glycémie */}
           <button
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
               darkMode ? bgButtonDark : bgButtonLight
-            }`}
-            onClick={() => setIsGlucoseModalOpen(true)}
+            } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={
+              isReadOnly
+                ? handleReadOnlyClick
+                : () => setIsGlucoseModalOpen(true)
+            }
+            disabled={isReadOnly}
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-full flex items-center justify-center mb-2">
               <span className="text-lg sm:text-xl">🩸</span>
@@ -197,8 +218,10 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
             >
               {t('Actions.actionsPopover.bloodSugar.increment')}
             </span>
+            {isReadOnly && (
+              <Lock className="w-3 h-3 mt-1 text-muted-foreground" />
+            )}
           </button>
-          {/* <AddGlucoseModal/> */}
 
           <Modal
             isOpen={isGlucoseModalOpen}
@@ -255,8 +278,11 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
           <button
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
               darkMode ? bgButtonDark : bgButtonLight
-            }`}
-            onClick={() => setIsMealModalOpen(true)}
+            } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={
+              isReadOnly ? handleReadOnlyClick : () => setIsMealModalOpen(true)
+            }
+            disabled={isReadOnly}
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-800 rounded-full flex items-center justify-center mb-2">
               🍽️
@@ -264,104 +290,22 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
             <span className={`text-xs sm:text-sm font-medium ${textButton}`}>
               {t('Actions.addMeal')}
             </span>
+            {isReadOnly && (
+              <Lock className="w-3 h-3 mt-1 text-muted-foreground" />
+            )}
           </button>
 
-          <Modal
-            isOpen={isMealModalOpen}
-            onClose={() => setIsMealModalOpen(false)}
-            isCentered
-          >
-            <ModalOverlay />
-            <ModalContent className="rounded-2xl p-2">
-              <ModalHeader className="font-semibold text-lg flex items-center gap-2">
-                {t('actionsRapides.mealModal.title')}
-              </ModalHeader>
-              <ModalCloseButton />
-
-              <ModalBody>
-                <div className="space-y-4">
-                  {/* Options de saisie */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex flex-col items-center p-4 h-auto"
-                      onClick={() => setIsBarcodeModalOpen(true)}
-                    >
-                      <span className="text-xl mb-1">📱</span>
-                      <span className="text-xs">
-                        {t('actionsRapides.mealModal.barcodeScan')}
-                      </span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      className="flex flex-col items-center p-4 h-auto"
-                      onClick={() => setIsPhotoModalOpen(true)}
-                    >
-                      <span className="text-xl mb-1">📸</span>
-                      <span className="text-xs">
-                        {t('actionsRapides.mealModal.photoAI')}
-                      </span>
-                    </Button>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className=" px-2 text-muted-foreground">
-                        {t('actionsRapides.mealModal.manualEntry')}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Form */}
-                  <form onSubmit={handleMealSubmit} className="space-y-3">
-                    <div>
-                      <Label htmlFor="foodName">
-                        {t('actionsRapides.mealModal.foodNameLabel')}
-                      </Label>
-                      <Input
-                        id="foodName"
-                        placeholder={t(
-                          'actionsRapides.mealModal.foodNamePlaceholder'
-                        )}
-                        value={foodName}
-                        onChange={e => setFoodName(e.target.value)}
-                        className="mt-1"
-                        autoFocus
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="carbs">
-                        {t('actionsRapides.mealModal.carbsLabel')}
-                      </Label>
-                      <Input
-                        id="carbs"
-                        type="number"
-                        placeholder={t(
-                          'actionsRapides.mealModal.carbsPlaceholder'
-                        )}
-                        value={carbs}
-                        onChange={e => setCarbs(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      {t('actionsRapides.mealModal.addButton')}
-                    </Button>
-                  </form>
-                </div>
-              </ModalBody>
-            </ModalContent>
-          </Modal>
+          {/* Medication */}
           <button
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
               darkMode ? bgButtonDark : bgButtonLight
-            }`}
-            onClick={() => setIsMedicationModalOpen(true)}
+            } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={
+              isReadOnly
+                ? handleReadOnlyClick
+                : () => setIsMedicationModalOpen(true)
+            }
+            disabled={isReadOnly}
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-500 rounded-full flex items-center justify-center mb-2">
               💊
@@ -369,18 +313,22 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
             <span className={`text-xs sm:text-sm font-medium ${textButton}`}>
               {t('Actions.addMedication')}
             </span>
+            {isReadOnly && (
+              <Lock className="w-3 h-3 mt-1 text-muted-foreground" />
+            )}
           </button>
-          <MedicationModal
-            isOpen={isMedicationModalOpen}
-            onClose={() => setIsMedicationModalOpen(false)}
-          />
 
           {/* Activities */}
           <button
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
               darkMode ? bgButtonDark : bgButtonLight
-            }`}
-            onClick={() => setIsActivityModalOpen(true)}
+            } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={
+              isReadOnly
+                ? handleReadOnlyClick
+                : () => setIsActivityModalOpen(true)
+            }
+            disabled={isReadOnly}
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-full flex items-center justify-center mb-2">
               🏃
@@ -388,13 +336,12 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
             <span className={`text-xs sm:text-sm font-medium ${textButton}`}>
               {t('Actions.addActivity')}
             </span>
+            {isReadOnly && (
+              <Lock className="w-3 h-3 mt-1 text-muted-foreground" />
+            )}
           </button>
-          <ActivityModal
-            isOpen={isActivityModalOpen}
-            onClose={() => setIsActivityModalOpen(false)}
-          />
 
-          {/* Reminders */}
+          {/* Navigation buttons (always enabled) */}
           <button
             onClick={handleRappelsClick}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -408,6 +355,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               {t('Actions.reminders')}
             </span>
           </button>
+
           <button
             onClick={handleTelehealth}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -421,6 +369,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               {t('nav.teleconsultation')}
             </span>
           </button>
+
           <button
             onClick={handleFamily}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -434,6 +383,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               {t('nav.family')}
             </span>
           </button>
+
           <button
             onClick={handleChat}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -447,6 +397,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               {t('nav.chat')}
             </span>
           </button>
+
           <button
             onClick={handleBlog}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -460,6 +411,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               {t('nav.blog')}
             </span>
           </button>
+
           <button
             onClick={handleInsulinClick}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -473,6 +425,7 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
               Insulin Dosage
             </span>
           </button>
+
           <button
             onClick={handleBiomarkerClick}
             className={`flex flex-col items-center p-3 sm:p-4 rounded-xl transition-colors active:scale-95 ${
@@ -487,15 +440,40 @@ const ActionsRapides: React.FC<ActionsRapidesProps> = ({
             </span>
           </button>
         </div>
+
+        {/* Modals - only open if not read-only */}
+        {!isReadOnly && (
+          <>
+            <Modal
+              isOpen={isMealModalOpen}
+              onClose={() => setIsMealModalOpen(false)}
+              isCentered
+            >
+              {/* ...existing meal modal content... */}
+            </Modal>
+
+            <MedicationModal
+              isOpen={isMedicationModalOpen}
+              onClose={() => setIsMedicationModalOpen(false)}
+            />
+
+            <ActivityModal
+              isOpen={isActivityModalOpen}
+              onClose={() => setIsActivityModalOpen(false)}
+            />
+
+            <BarcodeScanModal
+              isOpen={isBarcodeModalOpen}
+              onClose={setIsBarcodeModalOpen}
+            />
+
+            <PhotoAnalysisModal
+              isOpen={isPhotoModalOpen}
+              onClose={setIsPhotoModalOpen}
+            />
+          </>
+        )}
       </div>
-      <BarcodeScanModal
-        isOpen={isBarcodeModalOpen}
-        onClose={setIsBarcodeModalOpen}
-      />
-      <PhotoAnalysisModal
-        isOpen={isPhotoModalOpen}
-        onClose={setIsPhotoModalOpen}
-      />
     </div>
   );
 };

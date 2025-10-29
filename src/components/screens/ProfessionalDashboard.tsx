@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -112,16 +118,52 @@ export const ProfessionalDashboard = () => {
     }
   };
 
-  // Trying to get the active patient and then map through it
   const getActivePatients = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, specialty, phone');
+      const storedCode = localStorage.getItem('professionalCode');
+      if (!storedCode) {
+        console.error('No professional code found');
+        return;
+      }
 
-      // console.log('Active Patients:', data);
+      const { data, error } = await supabase
+        .from('professional_sessions')
+        .select(
+          `
+        id,
+        patient_code,
+        patient_name,
+        access_granted,
+        consultation_started_at,
+        consultation_ended_at,
+        profiles:patient_code (
+          id,
+          first_name, 
+          last_name,
+          specialty,
+          phone
+        )
+      `
+        )
+        .eq('professional_code', storedCode)
+        .eq('access_granted', true)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      setActivePatients(data);
+
+      // Filter out any null profile records and format the data
+      const activePatientsData = (data || [])
+        .filter((session: any) => session.profiles)
+        .map((session: any) => ({
+          id: session.profiles.id,
+          first_name: session.profiles.first_name,
+          last_name: session.profiles.last_name,
+          specialty: session.profiles.specialty,
+          phone: session.profiles.phone,
+          last_visit: session.consultation_ended_at,
+        }));
+
+      setActivePatients(activePatientsData);
     } catch (error) {
       console.error('Error fetching active patients:', error);
     }
@@ -222,6 +264,18 @@ export const ProfessionalDashboard = () => {
     status: patient.status || 'stable',
   }));
   const isMobile = useIsMobile();
+
+  interface Patient {
+    id: string;
+    name: string;
+    lastConsultation: string;
+    nextAppointment?: string;
+    notes?: string;
+    status?: string;
+    diabetesType?: string;
+    lastGlucose?: string;
+  }
+
   const patients: Patient[] = [
     {
       id: '1',
@@ -262,19 +316,19 @@ export const ProfessionalDashboard = () => {
       lastGlucose: '7.5 mmol/L',
     },
   ];
-    const darkMode = theme === "dark";
-  const [status, setStatus] = useState("");
-  const [notification, setNotification] = useState("");
-  const [fee, setFee] = useState("");
+  const darkMode = theme === 'dark';
+  const [status, setStatus] = useState('');
+  const [notification, setNotification] = useState('');
+  const [fee, setFee] = useState('');
 
   const handleSave = () => {
-    alert("Settings saved successfully!");
+    alert('Settings saved successfully!');
   };
 
   const handleCancel = () => {
-    setStatus("");
-    setNotification("");
-    setFee("");
+    setStatus('');
+    setNotification('');
+    setFee('');
   };
 
   return (
@@ -554,7 +608,9 @@ export const ProfessionalDashboard = () => {
                 {/* Patients */}
                 <Card
                   className={
-                    theme === 'dark' ? 'bg-gray-800/80 border-white/10 h-fit' : 'h-fit'
+                    theme === 'dark'
+                      ? 'bg-gray-800/80 border-white/10 h-fit'
+                      : 'h-fit'
                   }
                 >
                   <CardHeader>
@@ -622,23 +678,7 @@ export const ProfessionalDashboard = () => {
                 </Card>
                 <div className="flex flex-col gap-6">
                   {/* Quick Actions */}
-                  <Card
-                    className={
-                      theme === 'dark'
-                        ? 'bg-gray-800/80 border-white/10 h-fit'
-                        : 'h-fit'
-                    }
-                  >
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <Stethoscope className="h-5 w-5 mr-2" />
-                        {t('professionalDashboard.overview.quickActions.title')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <QuickActions />
-                    </CardContent>
-                  </Card>
+
                   {/* Notes des patients */}
                   <Card>
                     <CardHeader>
@@ -720,112 +760,116 @@ export const ProfessionalDashboard = () => {
 
           {activeTab === 'settings' && (
             <Card
-      className={`max-w-lg mx-auto ${
-        darkMode
-          ? "bg-gray-800/80 border-white/10 text-gray-100"
-          : "bg-white border-gray-200 text-gray-800"
-      }`}
-    >
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Account Settings</CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        <p
-          className={`text-sm ${
-            darkMode ? "text-gray-400" : "text-gray-500"
-          }`}
-        >
-          Manage your account preferences and dashboard appearance.
-        </p>
-
-        {/* === Form === */}
-        <form className="space-y-5">
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Status</label>
-            <select
-              className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
+              className={`max-w-lg mx-auto ${
                 darkMode
-                  ? "bg-[#137657] text-[#E2E8F0]"
-                  : "bg-white border border-gray-300 text-gray-800"
+                  ? 'bg-gray-800/80 border-white/10 text-gray-100'
+                  : 'bg-white border-gray-200 text-gray-800'
               }`}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
             >
-              <option value="">Select status</option>
-              <option value="available">Available</option>
-              <option value="busy">Busy</option>
-              <option value="offline">Offline</option>
-            </select>
-          </div>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  Account Settings
+                </CardTitle>
+              </CardHeader>
 
-          {/* Notifications */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Notifications
-            </label>
-            <select
-              className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
-                darkMode
-                  ? "bg-[#137657] text-[#E2E8F0]"
-                  : "bg-white border border-gray-300 text-gray-800"
-              }`}
-              value={notification}
-              onChange={(e) => setNotification(e.target.value)}
-            >
-              <option value="">Select notification preference</option>
-              <option value="all">All</option>
-              <option value="important">Important only</option>
-              <option value="none">None</option>
-            </select>
-          </div>
+              <CardContent className="space-y-6">
+                <p
+                  className={`text-sm ${
+                    darkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}
+                >
+                  Manage your account preferences and dashboard appearance.
+                </p>
 
-          {/* Consultation Fee */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Consultation Fee (XOF)
-            </label>
-            <input
-              type="number"
-              placeholder="5000"
-              className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
-                darkMode
-                  ? "bg-[#137657] text-[#E2E8F0]"
-                  : "bg-white border border-gray-300 text-gray-800"
-              }`}
-              value={fee}
-              onChange={(e) => setFee(e.target.value)}
-            />
-          </div>
-        </form>
-      </CardContent>
+                {/* === Form === */}
+                <form className="space-y-5">
+                  {/* Status */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Status
+                    </label>
+                    <select
+                      className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
+                        darkMode
+                          ? 'bg-[#137657] text-[#E2E8F0]'
+                          : 'bg-white border border-gray-300 text-gray-800'
+                      }`}
+                      value={status}
+                      onChange={e => setStatus(e.target.value)}
+                    >
+                      <option value="">Select status</option>
+                      <option value="available">Available</option>
+                      <option value="busy">Busy</option>
+                      <option value="offline">Offline</option>
+                    </select>
+                  </div>
 
-      {/* Footer Buttons */}
-      <CardFooter className="flex justify-end gap-3">
-        <Button
-          variant="outline"
-          className={`text-sm ${
-            darkMode
-              ? "border-[#AEE6DA] text-[#AEE6DA] hover:bg-[#155E47]"
-              : "border-gray-300 text-gray-700 hover:bg-gray-100"
-          }`}
-          onClick={handleCancel}
-        >
-          Cancel
-        </Button>
-        <Button
-          className={`text-sm text-white ${
-            darkMode
-              ? "bg-[#FA6657] hover:bg-[#F7845D]"
-              : "bg-blue-500 hover:bg-blue-600"
-          }`}
-          onClick={handleSave}
-        >
-          Save
-        </Button>
-      </CardFooter>
-    </Card>
+                  {/* Notifications */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Notifications
+                    </label>
+                    <select
+                      className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
+                        darkMode
+                          ? 'bg-[#137657] text-[#E2E8F0]'
+                          : 'bg-white border border-gray-300 text-gray-800'
+                      }`}
+                      value={notification}
+                      onChange={e => setNotification(e.target.value)}
+                    >
+                      <option value="">Select notification preference</option>
+                      <option value="all">All</option>
+                      <option value="important">Important only</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+
+                  {/* Consultation Fee */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Consultation Fee (XOF)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="5000"
+                      className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
+                        darkMode
+                          ? 'bg-[#137657] text-[#E2E8F0]'
+                          : 'bg-white border border-gray-300 text-gray-800'
+                      }`}
+                      value={fee}
+                      onChange={e => setFee(e.target.value)}
+                    />
+                  </div>
+                </form>
+              </CardContent>
+
+              {/* Footer Buttons */}
+              <CardFooter className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  className={`text-sm ${
+                    darkMode
+                      ? 'border-[#AEE6DA] text-[#AEE6DA] hover:bg-[#155E47]'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className={`text-sm text-white ${
+                    darkMode
+                      ? 'bg-[#FA6657] hover:bg-[#F7845D]'
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+                  onClick={handleSave}
+                >
+                  Save
+                </Button>
+              </CardFooter>
+            </Card>
           )}
         </div>
       </div>

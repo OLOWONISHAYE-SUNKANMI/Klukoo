@@ -1,114 +1,60 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-// Setup type definitions for built-in Supabase Runtime APIs
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-
+// supabase/functions/send-access-code-sms/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const getEnv = (key: string) =>
-  (globalThis as any).Deno?.env?.get(key) ??
-  (globalThis as any).process?.env?.[key] ??
-  '';
-
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-console.log('Hello from Functions!');
+const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')!;
+const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')!;
+const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')!;
 
 serve(async req => {
-  // Log all incoming requests
-  console.log('📨 Incoming Twilio webhook');
-
   try {
-    // Parse Twilio's form data
-    const formData = await req.formData();
-    const from = formData.get('From') as string;
-    const body = formData.get('Body') as string;
-    const messageSid = formData.get('MessageSid') as string;
+    const { phoneNumber, accessCode, patientName } = await req.json();
 
-    console.log('From:', from);
-    console.log('Body:', body);
-    console.log('MessageSid:', messageSid);
-
-    // Parse format: "ABC123-1" or "ABC123-2"
-    const match = body.trim().match(/^([A-Z0-9]{6})-([12])$/i);
-
-    if (!match) {
-      console.log('❌ Invalid format');
+    // Validate input
+    if (!phoneNumber || !accessCode) {
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Message>Invalid format. Please reply with CODE-1 to approve or CODE-2 to deny.</Message></Response>',
-        {
-          status: 200,
-          headers: { 'Content-Type': 'text/xml' },
-        }
+        JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const [, responseCode, action] = match;
-    const response = parseInt(action);
+    // Format message
+    const message = `Your Klukoo access code for ${patientName}'s health records is: ${accessCode}. This code expires in 24 hours.`;
 
-    console.log('Response Code:', responseCode);
-    console.log('Action:', response === 1 ? 'APPROVE' : 'DENY');
+    // Send SMS via Twilio
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
 
-    // Process the response using the RPC function
-    const { data, error } = await supabase.rpc('process_access_response', {
-      p_response_code: responseCode.toUpperCase(),
-      p_response: response,
+    const formData = new URLSearchParams();
+    formData.append('To', phoneNumber);
+    formData.append('From', TWILIO_PHONE_NUMBER);
+    formData.append('Body', message);
+
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        Authorization:
+          'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
     });
 
-    if (error) {
-      console.error('❌ RPC Error:', error);
-      return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Message>Error processing your response. Please try again or contact support.</Message></Response>',
-        {
-          status: 200,
-          headers: { 'Content-Type': 'text/xml' },
-        }
-      );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Twilio error: ${error}`);
     }
 
-    const result = data as {
-      success: boolean;
-      message?: string;
-      error?: string;
-    };
-
-    console.log('✅ Result:', result);
-
-    if (result.success) {
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${
-          result.message || 'Thank you! Your response has been recorded.'
-        }</Message></Response>`,
-        {
-          status: 200,
-          headers: { 'Content-Type': 'text/xml' },
-        }
-      );
-    }
+    const result = await response.json();
 
     return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${
-        result.error ||
-        'Could not process your response. The code may be invalid or expired.'
-      }</Message></Response>`,
-      {
-        status: 200,
-        headers: { 'Content-Type': 'text/xml' },
-      }
+      JSON.stringify({ success: true, messageSid: result.sid }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
-    console.error('❌ Webhook error:', error);
-    return new Response(
-      '<?xml version="1.0" encoding="UTF-8"?><Response><Message>An error occurred. Please try again later.</Message></Response>',
-      {
-        status: 200,
-        headers: { 'Content-Type': 'text/xml' },
-      }
-    );
+  } catch (error) {
+    console.error('SMS Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -11,6 +11,7 @@ import NotFound from './pages/NotFound';
 import PaymentSuccess from './components/screens/PaymentSuccess';
 import PaymentScreen from './components/screens/PaymentScreen';
 import { ProfessionalDashboard } from './components/screens/ProfessionalDashboard';
+import FamilyDashboard from './components/screens/FamilyDashboard';
 import { ProfessionalRegistrationScreen } from './components/screens/ProfessionalRegistrationScreen';
 import { ChakraProvider } from '@chakra-ui/react';
 import { Toaster } from 'sonner';
@@ -76,6 +77,14 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <Index />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/family-dashboard"
+            element={
+              <ProtectedRoute>
+                <FamilyDashboard />
               </ProtectedRoute>
             }
           />

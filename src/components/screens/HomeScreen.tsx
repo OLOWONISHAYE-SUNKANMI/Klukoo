@@ -9,12 +9,21 @@ import { useGlucose } from '@/contexts/GlucoseContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeStore } from '@/store/useThemeStore'; // ✅ Zustand theme store
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 interface HomeScreenProps {
   onTabChange?: (tab: string) => void;
+  isReadOnly?: boolean;
+  familyMemberId?: string;
+  patientUserId?: string;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ onTabChange }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({
+  onTabChange,
+  isReadOnly = false,
+  familyMemberId,
+  patientUserId,
+}) => {
   const { t } = useTranslation();
   const [glucoseValue, setGlucoseValue] = useState<string>('');
   const [showAddMeasure, setShowAddMeasure] = useState(false);
@@ -33,6 +42,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onTabChange }) => {
     user?.user_metadata?.first_name ||
     user?.email ||
     'Invité';
+
+  const handleAddMeasure = () => {
+    if (isReadOnly) {
+      toast.error('You can only view data in read-only mode');
+      return;
+    }
+    setShowAddMeasure(true);
+  };
 
   const latestReading = getLatestReading();
   const currentGlucose = latestReading?.value || 126;
@@ -75,11 +92,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onTabChange }) => {
         {/* Actions Rapides */}
         <ActionsRapides
           onTabChange={onTabChange}
-          onGlucoseSubmit={value => setGlucoseValue(value)}
-          onGlycemieClick={() => setShowAddMeasure(true)}
-          onMedicamentClick={() => setShowAddDose(true)}
-          onMealClick={() => setShowAddMeal(true)}
-          onActivityClick={() => setShowAddActivity(true)}
+          onGlucoseSubmit={
+            isReadOnly ? () => {} : value => setGlucoseValue(value)
+          }
+          onGlycemieClick={
+            isReadOnly
+              ? () => toast.error('Read-only access')
+              : () => setShowAddMeasure(true)
+          }
+          onMedicamentClick={
+            isReadOnly
+              ? () => toast.error('Read-only access')
+              : () => setShowAddDose(true)
+          }
+          onMealClick={
+            isReadOnly
+              ? () => toast.error('Read-only access')
+              : () => setShowAddMeal(true)
+          }
+          onActivityClick={
+            isReadOnly
+              ? () => toast.error('Read-only access')
+              : () => setShowAddActivity(true)
+          }
+          isReadOnly={isReadOnly}
         />
 
         {/* Predictive Alerts */}
