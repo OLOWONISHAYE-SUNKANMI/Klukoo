@@ -67,6 +67,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface Patient {
   id: string;
   name: string;
+  phone?: string;
   lastConsultation: string;
   nextAppointment?: string;
   notes: string;
@@ -94,7 +95,7 @@ export const PatientManagement = () => {
   const [isPatientCodeModalOpen, setIsPatientCodeModalOpen] = useState(false);
   const [patientCode, setPatientCode] = useState('');
   const [selectedAction, setSelectedAction] = useState<{
-    type: 'view' | 'message' | 'teleconsultation' | 'call' | 'edit';
+    type: 'view' | 'message' | 'teleconsultation' | 'call';
     patientId: string;
     patientName: string;
   } | null>(null);
@@ -104,7 +105,7 @@ export const PatientManagement = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [isTeleconsultationOpen, setIsTeleconsultationOpen] = useState(false);
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [callNotes, setCallNotes] = useState('');
   const [activePatient, setActivePatient] = useState<Patient | null>(null);
   const [patientsCurrentPage, setPatientsCurrentPage] = useState(1);
   const [consultationsCurrentPage, setConsultationsCurrentPage] = useState(1);
@@ -113,7 +114,7 @@ export const PatientManagement = () => {
   const [loading, setLoading] = useState(false);
 
   const handlePatientAction = (
-    action: 'view' | 'message' | 'teleconsultation' | 'call' | 'edit',
+    action: 'view' | 'message' | 'teleconsultation' | 'call',
     patientId: string,
     patientName: string
   ) => {
@@ -145,9 +146,6 @@ export const PatientManagement = () => {
       case 'call':
         setIsCallModalOpen(true);
         break;
-      case 'edit':
-        setIsEditModalOpen(true);
-        break;
     }
 
     // Fermer le modal de code patient
@@ -161,6 +159,37 @@ export const PatientManagement = () => {
   const patientsEndIndex = patientsStartIndex + itemsPerPage;
   const consultationsStartIndex = (consultationsCurrentPage - 1) * itemsPerPage;
   const consultationsEndIndex = consultationsStartIndex + itemsPerPage;
+
+  const handleCompleteCall = async () => {
+    if (!activePatient || !professionalCode) return;
+    
+    try {
+      // Update consultation request status to completed
+      const { error } = await supabase
+        .from('consultation_requests')
+        .update({ 
+          status: 'completed',
+          professional_response: callNotes || 'Call completed'
+        })
+        .eq('patient_id', activePatient.id)
+        .eq('professional_code', professionalCode);
+
+      if (error) throw error;
+
+      // Update local patient status
+      setPatients(prev => prev.map(p => 
+        p.id === activePatient.id 
+          ? { ...p, status: 'Completed' }
+          : p
+      ));
+
+      setIsCallModalOpen(false);
+      setCallNotes('');
+      setActivePatient(null);
+    } catch (error) {
+      console.error('Error completing call:', error);
+    }
+  };
 
   const fetchPatients = async () => {
     if (!professionalCode) return;
@@ -196,9 +225,10 @@ export const PatientManagement = () => {
         return {
           id: patient.user_id,
           name: `${patient.first_name} ${patient.last_name}`,
+          phone: patient.phone || 'N/A',
           lastConsultation: latestRequest?.requested_at || new Date().toISOString(),
           notes: 'Patient suivi via consultation',
-          status: 'Stable',
+          status: latestRequest?.status === 'completed' ? 'Completed' : 'Pending',
           diabetesType: 'Type 2',
           lastGlucose: '7.2 mmol/L',
         };
@@ -463,16 +493,14 @@ export const PatientManagement = () => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 handlePatientAction(
-                                  'edit',
+                                  'call',
                                   patient.id,
                                   patient.name
                                 );
                               }}
                             >
-                              <Edit className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.fifth'
-                              )}
+                              <Phone className="mr-2 h-4 w-4" />
+                              Book a Call
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1107,166 +1135,50 @@ export const PatientManagement = () => {
 
             <div>
               <p className="font-medium text-lg">{activePatient?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                Phone: {activePatient?.phone}
+              </p>
               <p className="text-muted-foreground">
-                {t('patientManagement.call.ready')}
+                Ready to call
               </p>
             </div>
 
             <div>
               <Label htmlFor="phone-notes">
-                {t('patientManagement.call.notesLabel')}
+                Call Notes
               </Label>
               <Textarea
                 id="phone-notes"
-                placeholder={t('patientManagement.call.notesPlaceholder')}
+                placeholder="Add notes about the call..."
                 className="min-h-20"
+                value={callNotes}
+                onChange={(e) => setCallNotes(e.target.value)}
               />
             </div>
 
             <div className="flex justify-center space-x-2">
               <Button
                 variant="outline"
-                onClick={() => setIsCallModalOpen(false)}
+                onClick={() => {
+                  setIsCallModalOpen(false);
+                  setCallNotes('');
+                }}
               >
-                {t('patientManagement.call.cancel')}
+                Cancel
               </Button>
-              <Button className="bg-green-600 hover:bg-green-700">
+              <Button 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleCompleteCall}
+              >
                 <Phone className="mr-2 h-4 w-4" />
-                {t('patientManagement.call.dial')}
+                Complete Call
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal Édition du profil */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        size="2xl"
-        scrollBehavior="inside"
-      >
-        <ModalOverlay />
-        <ModalContent borderRadius="xl" p={4}>
-          <ModalHeader>
-            {t('patientManagement.editProfile.title', {
-              patientName: activePatient?.name,
-            })}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <p className="text-gray-500 mb-4">
-              {t('patientManagement.editProfile.description')}
-            </p>
 
-            {activePatient && (
-              <div className="space-y-4">
-                {/* Name and Diabetes Type */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormControl>
-                    <FormLabel htmlFor="edit-name">
-                      {t('patientManagement.editProfile.name')}
-                    </FormLabel>
-                    <Input
-                      id="edit-name"
-                      defaultValue={activePatient.name}
-                      focusBorderColor="blue.500"
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel htmlFor="edit-diabetes-type">
-                      {t('patientManagement.editProfile.diabetesType')}
-                    </FormLabel>
-                    <Input
-                      id="edit-diabetes-type"
-                      defaultValue={activePatient.diabetesType}
-                      focusBorderColor="blue.500"
-                    />
-                  </FormControl>
-                </div>
-
-                {/* Status */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-status">
-                    {t('patientManagement.editProfile.status')}
-                  </FormLabel>
-                  <Select
-                    id="edit-status"
-                    defaultValue={activePatient.status}
-                    focusBorderColor="blue.500"
-                  >
-                    <option value="stable">
-                      {t('patientManagement.editProfile.statusOptions.stable')}
-                    </option>
-                    <option value="attention">
-                      {t(
-                        'patientManagement.editProfile.statusOptions.attention'
-                      )}
-                    </option>
-                    <option value="amélioration">
-                      {t(
-                        'patientManagement.editProfile.statusOptions.improving'
-                      )}
-                    </option>
-                  </Select>
-                </FormControl>
-
-                {/* Glucose */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-glucose">
-                    {t('patientManagement.editProfile.lastGlucose')}
-                  </FormLabel>
-                  <Input
-                    id="edit-glucose"
-                    defaultValue={activePatient.lastGlucose}
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-
-                {/* Notes */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-notes">
-                    {t('patientManagement.editProfile.notes')}
-                  </FormLabel>
-                  <Textarea
-                    id="edit-notes"
-                    defaultValue={activePatient.notes}
-                    minH="120px"
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-
-                {/* Next Appointment */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-next-appointment">
-                    {t('patientManagement.editProfile.nextAppointment')}
-                  </FormLabel>
-                  <Input
-                    id="edit-next-appointment"
-                    type="date"
-                    defaultValue={activePatient.nextAppointment}
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-              </div>
-            )}
-          </ModalBody>
-
-          <ModalFooter>
-            <Button
-              variant="outline"
-              mr={3}
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              {t('patientManagement.editProfile.cancel')}
-            </Button>
-            <Button colorScheme="blue">
-              {t('patientManagement.editProfile.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 };
