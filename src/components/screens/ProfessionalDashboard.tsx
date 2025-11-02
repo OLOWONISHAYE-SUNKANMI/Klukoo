@@ -437,11 +437,11 @@ export const ProfessionalDashboard = () => {
                     icon: Users,
                     label: t('healthProfessionalScreen.tabs.patients'),
                   },
-                  {
-                    id: 'consultations',
-                    icon: Calendar,
-                    label: t('healthProfessionalScreen.tabs.consultations'),
-                  },
+                  // {
+                  //   id: 'consultations',
+                  //   icon: Calendar,
+                  //   label: t('healthProfessionalScreen.tabs.consultations'),
+                  // },
                   {
                     id: 'earnings',
                     icon: DollarSign,
