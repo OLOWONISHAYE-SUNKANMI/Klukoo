@@ -34,7 +34,10 @@ const PredictiveCard: React.FC<PredictiveCardProps> = ({
       setSummary('');
       setLoading(true);
       getAISummary(values)
-        .then(result => setSummary(result))
+        .then(result => {
+          console.log('AI Summary Result:', result);
+          setSummary(result);
+        })
         .catch(error => {
           setSummary(t('predictiveCard.aiSummary.error'));
           console.error('predictiveCard.aiSummary.error', error);

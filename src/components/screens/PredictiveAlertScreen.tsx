@@ -137,6 +137,9 @@ export default function PredictiveAlertScreen({ values }: any) {
       carbs,
       activity
     );
+
+    console.log('Predicted Glucose Value:', predictedValue);
+
     setPrediction(predictedValue);
     checkAlerts(predictedValue);
 
@@ -338,7 +341,11 @@ export default function PredictiveAlertScreen({ values }: any) {
                 </label>
                 <input
                   type="text"
-                  value={medications?.[0]?.dose ? `${medications[0].dose} ${medications[0].dose_unit}` : ''}
+                  value={
+                    medications?.[0]?.dose
+                      ? `${medications[0].dose} ${medications[0].dose_unit}`
+                      : ''
+                  }
                   readOnly
                   className="w-full px-3 py-2 text-foreground bg-background border border-accent rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
                 />
@@ -512,69 +519,76 @@ export default function PredictiveAlertScreen({ values }: any) {
         {/* Main Display */}
         <div className="lg:col-span-2 space-y-6">
           {/* Real-Time Graph */}
-      <Card>
-          <CardHeader>
-            <CardTitle>{t('charts.glucose')}</CardTitle>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={glucoseData}
-                margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('charts.glucose')}</CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart
+                  data={glucoseData}
+                  margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
 
-               <XAxis
-                  dataKey="time"
-                  type="category"
-                  interval="preserveStartEnd"
-                  label={{
-                    position: 'insideBottom',
-                    offset: -5,
-                  }}
-                />
+                  <XAxis
+                    dataKey="time"
+                    type="category"
+                    interval="preserveStartEnd"
+                    label={{
+                      position: 'insideBottom',
+                      offset: -5,
+                    }}
+                  />
 
+                  <YAxis
+                    label={{
+                      angle: -90,
+                      position: 'insideLeft',
+                    }}
+                  />
 
-                <YAxis
-                  label={{
-                    angle: -90,
-                    position: 'insideLeft',
-                  }}
-                />
+                  <Tooltip
+                    formatter={(value: any) => [
+                      `${value} mg/dL`,
+                      'Blood Glucose',
+                    ]}
+                    labelFormatter={(label, payload) => {
+                      const item = payload?.[0]?.payload;
+                      const date = new Date(item?.timestamp);
+                      return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+                    }}
+                  />
 
-                <Tooltip
-                  formatter={(value: any) => [`${value} mg/dL`, 'Blood Glucose']}
-                  labelFormatter={(label, payload) => {
-                    const item = payload?.[0]?.payload;
-                    const date = new Date(item?.timestamp);
-                    return date.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
-                  }}
-                />
+                  <Legend verticalAlign="top" height={36} />
 
-                <Legend verticalAlign="top" height={36} />
+                  <ReferenceArea
+                    y1={80}
+                    y2={180}
+                    fill="green"
+                    fillOpacity={0.1}
+                  />
+                  <ReferenceLine y={70} stroke="blue" strokeDasharray="5 5" />
+                  <ReferenceLine y={250} stroke="red" strokeDasharray="5 5" />
 
-                <ReferenceArea y1={80} y2={180} fill="green" fillOpacity={0.1} />
-                <ReferenceLine y={70} stroke="blue" strokeDasharray="5 5" />
-                <ReferenceLine y={250} stroke="red" strokeDasharray="5 5" />
-
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#0d9488"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                  name="Blood Glucose"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#0d9488"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                    name="Blood Glucose"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           {/* Alerts System */}
           <div className="bg-background rounded-xl shadow-lg p-6">
