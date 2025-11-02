@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -61,6 +61,8 @@ import {
   SimpleGrid,
   Select,
 } from '@chakra-ui/react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Patient {
   id: string;
@@ -85,6 +87,7 @@ interface Consultation {
 
 export const PatientManagement = () => {
   const { t } = useTranslation();
+  const { professionalCode } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date()
   );
@@ -106,6 +109,8 @@ export const PatientManagement = () => {
   const [patientsCurrentPage, setPatientsCurrentPage] = useState(1);
   const [consultationsCurrentPage, setConsultationsCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const handlePatientAction = (
     action: 'view' | 'message' | 'teleconsultation' | 'call' | 'edit',
@@ -157,47 +162,59 @@ export const PatientManagement = () => {
   const consultationsStartIndex = (consultationsCurrentPage - 1) * itemsPerPage;
   const consultationsEndIndex = consultationsStartIndex + itemsPerPage;
 
-  // Données de démo
-  const patients: Patient[] = [
-    {
-      id: '1',
-      name: 'Marie Dubois',
-      lastConsultation: '2024-01-15',
-      nextAppointment: '2024-01-22',
-      notes: t('professionalDashboard.patients.recentNotes.people.first'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.first'),
-      diabetesType: 'Type 2',
-      lastGlucose: '7.2 mmol/L',
-    },
-    {
-      id: '2',
-      name: 'Pierre Martin',
-      lastConsultation: '2024-01-14',
-      notes: t('professionalDashboard.patients.recentNotes.people.second'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.second'),
-      diabetesType: 'Type 1',
-      lastGlucose: '6.8 mmol/L',
-    },
-    {
-      id: '3',
-      name: 'Sophie Laurent',
-      lastConsultation: '2024-01-12',
-      nextAppointment: '2024-01-19',
-      notes: t('professionalDashboard.patients.recentNotes.people.third'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.third'),
-      diabetesType: 'Type 2',
-      lastGlucose: '8.1 mmol/L',
-    },
-    {
-      id: '4',
-      name: 'Jean Bernard',
-      lastConsultation: '2024-01-10',
-      notes: t('professionalDashboard.patients.recentNotes.people.fourth'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.fourth'),
-      diabetesType: 'Type 2',
-      lastGlucose: '7.5 mmol/L',
-    },
-  ];
+  const fetchPatients = async () => {
+    if (!professionalCode) return;
+    
+    setLoading(true);
+    try {
+      const { data: requests, error } = await supabase
+        .from('consultation_requests')
+        .select('patient_id, requested_at')
+        .eq('professional_code', professionalCode);
+
+      if (error) throw error;
+
+      const patientIds = [...new Set(requests?.map(r => r.patient_id) || [])];
+      
+      if (patientIds.length === 0) {
+        setPatients([]);
+        return;
+      }
+
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, phone')
+        .in('user_id', patientIds);
+
+      if (profileError) throw profileError;
+
+      const activePatients = profiles?.map(patient => {
+        const latestRequest = requests
+          ?.filter(req => req.patient_id === patient.user_id)
+          .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())[0];
+        
+        return {
+          id: patient.user_id,
+          name: `${patient.first_name} ${patient.last_name}`,
+          lastConsultation: latestRequest?.requested_at || new Date().toISOString(),
+          notes: 'Patient suivi via consultation',
+          status: 'Stable',
+          diabetesType: 'Type 2',
+          lastGlucose: '7.2 mmol/L',
+        };
+      }) || [];
+
+      setPatients(activePatients);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, [professionalCode]);
 
   const paginatedPatients = patients.slice(
     patientsStartIndex,
@@ -325,15 +342,15 @@ export const PatientManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Patient</TableHead>
-                    <TableHead>
-                      {t('professionalDashboard.patients.title')}
-                    </TableHead>
+                    {/* <TableHead>Patient</TableHead> */}
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.first')}
                     </TableHead>
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.second')}
+                    </TableHead>
+                    <TableHead>
+                      {t('professionalDashboard.patients.tableHeading.third')}
                     </TableHead>
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.fourth')}
@@ -344,8 +361,21 @@ export const PatientManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedPatients.map(patient => (
-                    <TableRow key={patient.id}>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Chargement des patients...
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedPatients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Aucun patient trouvé
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedPatients.map(patient => (
+                      <TableRow key={patient.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
@@ -447,8 +477,9 @@ export const PatientManagement = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
 
