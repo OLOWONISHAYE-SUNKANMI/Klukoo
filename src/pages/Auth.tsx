@@ -345,8 +345,8 @@ const AuthPage = () => {
         );
         setIsLoading(false);
         return;
-      };
-      
+      }
+
       // 3. Store session
       const familySession = {
         family_member_id: familyMember.id,

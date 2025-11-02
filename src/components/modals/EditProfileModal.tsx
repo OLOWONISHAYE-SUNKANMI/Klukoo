@@ -125,15 +125,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 />
               </div>
 
-              {/* Specialty */}
+              {/* Date of Birth */}
               <div className="flex flex-col">
                 <label className="text-sm mb-1">
                   Date of birth
                 </label>
                 <Input
                   size="sm"
-                  value={form.dob || ''}
-                  onChange={e => handleChange('dob', e.target.value)}
+                  type="date"
+                  value={form.date_of_birth || ''}
+                  onChange={e => handleChange('date_of_birth', e.target.value)}
                   _focus={{
                     borderColor: '#32948f',
                     boxShadow: '0 0 0 1px #32948f',
@@ -144,16 +145,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   }}
                 />
               </div>
-              <div>
 
-              {/* Professional License */}
-             <label className="text-sm mb-1">
+              {/* Profession */}
+              <div className="flex flex-col">
+                <label className="text-sm mb-1">
                   Profession
                 </label>
                 <Input
                   size="sm"
-                  value={form.profession || ''}
-                  onChange={e => handleChange('profession', e.target.value)}
+                  value={form.specialty || ''}
+                  onChange={e => handleChange('specialty', e.target.value)}
                   _focus={{
                     borderColor: '#32948f',
                     boxShadow: '0 0 0 1px #32948f',

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ConsultationProvider } from '@/contexts/ConsultationContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useOfflineDetection } from '@/hooks/useOfflineDetection';
 import Index from './pages/Index';
@@ -107,12 +108,14 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <ErrorBoundary>
           <AuthProvider>
-            <TooltipProvider>
-              <Toaster richColors position="top-right" />
-              <ToastContainer />
-              <ToastQueueIndicator />
-              <AppContent />
-            </TooltipProvider>
+            <ConsultationProvider>
+              <TooltipProvider>
+                <Toaster richColors position="top-right" />
+                <ToastContainer />
+                <ToastQueueIndicator />
+                <AppContent />
+              </TooltipProvider>
+            </ConsultationProvider>
           </AuthProvider>
         </ErrorBoundary>
       </QueryClientProvider>

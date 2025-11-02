@@ -45,9 +45,11 @@ export interface Professional {
 interface ConsultationContextType {
   professionals: Professional[];
   myRequests: ConsultationRequestWithProfessional[];
+  professionalRequests: ConsultationRequestWithProfessional[];
   loading: boolean;
   loadProfessionals: () => Promise<void>;
   loadMyRequests: () => Promise<void>;
+  loadProfessionalRequests: (professionalCode: string) => Promise<void>;
   submitRequest: (
     professionalId: string,
     reason: string,
@@ -64,6 +66,9 @@ export const ConsultationProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [myRequests, setMyRequests] = useState<
+    ConsultationRequestWithProfessional[]
+  >([]);
+  const [professionalRequests, setProfessionalRequests] = useState<
     ConsultationRequestWithProfessional[]
   >([]);
   const [loading, setLoading] = useState(false);
@@ -123,9 +128,9 @@ export const ConsultationProvider = ({ children }: { children: ReactNode }) => {
         .eq('patient_id', user.id)
         .order('requested_at', { ascending: false });
 
-      console.log('🔍 Supabase raw response:');
-      console.log('data:', data);
-      console.log('error:', error);
+      // console.log('🔍 Supabase raw response:');
+      // console.log('data:', data);
+      // console.log('error:', error);
 
       if (error) throw error;
 
@@ -147,6 +152,65 @@ export const ConsultationProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error loading requests:', err);
       toast({
         title: 'Failed to load your requests',
+        description: err.message || 'Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadProfessionalRequests = async (professionalCode: string) => {
+    setLoading(true);
+    try {
+      // First get consultation requests
+      const { data: requests, error: requestError } = await supabase
+        .from('consultation_requests')
+        .select(
+          'id, consultation_reason, consultation_fee, requested_at, status, professional_response, patient_id'
+        )
+        .eq('professional_code', professionalCode)
+        .order('requested_at', { ascending: false });
+
+      // console.log(requests);
+
+      if (requestError) throw requestError;
+
+      // Get unique patient IDs
+      const patientIds = [...new Set(requests?.map(r => r.patient_id) || [])];
+
+      // Then get patient profiles separately
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', patientIds);
+
+      if (profileError) throw profileError;
+
+      // Combine the data
+      const mappedRequests: ConsultationRequestWithProfessional[] = (
+        requests || []
+      ).map((req: any) => {
+        const patient = profiles?.find(p => p.id === req.patient_id);
+        return {
+          id: req.id,
+          consultation_reason: req.consultation_reason,
+          consultation_fee: req.consultation_fee,
+          requested_at: req.requested_at,
+          status: req.status,
+          professional_response: req.professional_response,
+          professional: null,
+          patient: patient || null,
+        };
+      });
+
+      // console.log(mappedRequests);
+
+      setProfessionalRequests(mappedRequests);
+    } catch (err: any) {
+      console.error('Error loading professional requests:', err);
+      toast({
+        title: 'Failed to load requests',
         description: err.message || 'Please try again later.',
         variant: 'destructive',
       });
@@ -234,17 +298,21 @@ export const ConsultationProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadProfessionals();
-    loadMyRequests();
-  }, [user?.id]);
+    if (user) {
+      loadMyRequests();
+    }
+  }, [user]);
 
   return (
     <ConsultationContext.Provider
       value={{
         professionals,
         myRequests,
+        professionalRequests,
         loading,
         loadProfessionals,
         loadMyRequests,
+        loadProfessionalRequests,
         submitRequest,
       }}
     >

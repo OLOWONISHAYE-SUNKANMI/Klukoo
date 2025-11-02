@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -227,6 +233,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('professional_code', code)
         .single();
 
+      console.log('🔍 Professional lookup result:', professional);
+
       if (lookupError || !professional) {
         return { success: false, error: 'Invalid professional code' };
       }
@@ -241,47 +249,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Professional account not approved' };
       }
 
-      // 4. Sign in or create auth user if needed
-      let authUser;
-      if (!professional.user_id) {
-        // Create new auth user if none exists
-        const { data: newUser, error: signUpError } =
-          await supabase.auth.signUp({
-            email: professional.email,
-            password: code, // Use professional code as initial password
-          });
+      // 4. Try to sign in with existing credentials or create account
+      let authResult;
 
-        if (signUpError) {
-          return { success: false, error: 'Failed to create account' };
-        }
+      if (professional.user_id) {
+        // Try to sign in with existing user
+        authResult = await supabase.auth.signInWithPassword({
+          email: professional.email,
+          password: code,
+        });
+      } else {
+        // Create new user account
+        authResult = await supabase.auth.signUp({
+          email: professional.email,
+          password: code,
+          options: {
+            emailRedirectTo: `${window.location.origin}/professional-dashboard`,
+            data: {
+              first_name: professional.first_name,
+              last_name: professional.last_name,
+              professional_type: professional.professional_type,
+            },
+          },
+        });
 
         // Update professional record with new user_id
-        const { error: updateError } = await supabase
-          .from('professional_applications')
-          .update({ user_id: newUser.user.id })
-          .eq('id', professional.id);
-
-        if (updateError) {
-          return { success: false, error: 'Failed to link account' };
+        if (authResult.data.user) {
+          await supabase
+            .from('professional_applications')
+            .update({ user_id: authResult.data.user.id })
+            .eq('id', professional.id);
         }
-
-        authUser = newUser.user;
-      } else {
-        // Sign in existing user
-        const { data: signInData, error: signInError } =
-          await supabase.auth.signInWithPassword({
-            email: professional.email,
-            password: code,
-          });
-
-        if (signInError) {
-          return { success: false, error: 'Invalid credentials' };
-        }
-
-        authUser = signInData.user;
       }
 
-      return { success: true, user: authUser };
+      console.log('🔍 Professional auth result:', authResult);
+
+      if (authResult.error) {
+        return { success: false, error: authResult.error.message };
+      }
+
+      // Set professional state
+      setProfessionalCode(code);
+      setIsProfessional(true);
+      setProfessionalData(professional);
+
+      return { success: true, user: authResult.data.user };
     } catch (error) {
       return {
         success: false,

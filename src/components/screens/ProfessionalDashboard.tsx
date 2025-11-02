@@ -33,7 +33,9 @@ import { toast } from 'sonner';
 import { useThemeStore } from '@/store/useThemeStore';
 import LanguageToggle from '@/components/ui/LanguageToggle';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseService } from '@/lib/supabase-service';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConsultation } from '@/contexts/ConsultationContext';
 import { useTranslation } from 'react-i18next';
 import {
   Drawer,
@@ -46,7 +48,6 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export const ProfessionalDashboard = () => {
-  const [user, setUser] = useState(null);
   const [activePatients, setActivePatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [reports, setReports] = useState([]);
@@ -56,8 +57,8 @@ export const ProfessionalDashboard = () => {
   const [showAllPatients, setShowAllPatients] = useState(false);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
-  const { professionalCode } = useAuth();
-  console.log('Professional Info:', professionalInfo);
+  const { user, professionalCode, professionalData } = useAuth();
+  const { professionalRequests, loadProfessionalRequests } = useConsultation();
 
   const isDark = theme === 'dark';
   const { t } = useTranslation();
@@ -78,28 +79,30 @@ export const ProfessionalDashboard = () => {
       return;
     }
 
-    getActivePatients();
-    getUpcomingAppointments();
-    getCompletedReports();
-    getProfessionalInfo();
-    getUser();
+    // Wait for user to be available (either real or mock)
+    if (professionalCode || storedCode) {
+      loadData();
+    }
   }, [user, navigate]);
 
-  const getUser = async () => {
-    const { data, error } = await supabase.auth.getUser();
-    // console.log('User:', data);
-    if (error) {
-      console.error('Error fetching user:', error.message);
-    } else if (data) {
-      setUser(data);
-    }
+  const loadData = async () => {
+    await getProfessionalInfo();
+    await getUpcomingAppointments();
+    await getCompletedReports();
   };
 
+  // Load active patients after appointments are loaded
+  useEffect(() => {
+    if (appointments.length > 0) {
+      getActivePatients();
+    }
+  }, [appointments]);
   // Get professional info
   // Trying to use the professional code to get the excat info for the excat professional in the dashboard.
   const getProfessionalInfo = async () => {
     try {
       const storedCode = localStorage.getItem('professionalCode');
+      console.log(storedCode);
       if (!storedCode) {
         console.error('No professional code found');
         return;
@@ -111,6 +114,7 @@ export const ProfessionalDashboard = () => {
         .select('first_name, last_name, professional_type')
         .eq('professional_code', storedCode);
 
+      // console.log(data);
       if (error) throw error;
       setProfessionalInfo(data[0]);
     } catch (error) {
@@ -118,52 +122,47 @@ export const ProfessionalDashboard = () => {
     }
   };
 
+  // Fetch patients who created consultation requests for this professional
   const getActivePatients = async () => {
     try {
-      const storedCode = localStorage.getItem('professionalCode');
-      if (!storedCode) {
-        console.error('No professional code found');
+      // Get unique patient IDs from appointments
+      const patientIds = [...new Set(appointments.map(apt => apt.patient_id))];
+
+      if (patientIds.length === 0) {
+        setActivePatients([]);
         return;
       }
+      console.log('pateintIds', patientIds);
 
-      const { data, error } = await supabase
-        .from('professional_sessions')
-        .select(
-          `
-        id,
-        patient_code,
-        patient_name,
-        access_granted,
-        consultation_started_at,
-        consultation_ended_at,
-        profiles:patient_code (
-          id,
-          first_name, 
-          last_name,
-          specialty,
-          phone
-        )
-      `
-        )
-        .eq('professional_code', storedCode)
-        .eq('access_granted', true)
-        .order('created_at', { ascending: false });
+      // Fetch patient profiles using user_id instead of id
+      const { data: patients, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, phone')
+        .in('user_id', patientIds);
 
       if (error) throw error;
+      console.log('patients:', patients);
 
-      // Filter out any null profile records and format the data
-      const activePatientsData = (data || [])
-        .filter((session: any) => session.profiles)
-        .map((session: any) => ({
-          id: session.profiles.id,
-          first_name: session.profiles.first_name,
-          last_name: session.profiles.last_name,
-          specialty: session.profiles.specialty,
-          phone: session.profiles.phone,
-          last_visit: session.consultation_ended_at,
-        }));
+      // Combine patient data with their latest consultation info
+      const activePatients = patients.map(patient => {
+        const latestRequest = appointments
+          .filter(apt => apt.patient_id === patient.user_id)
+          .sort(
+            (a, b) => new Date(b.requested_at) - new Date(a.requested_at)
+          )[0];
 
-      setActivePatients(activePatientsData);
+        return {
+          id: patient.user_id,
+          first_name: patient.first_name,
+          last_name: patient.last_name,
+          phone: patient.phone || '',
+          last_visit: latestRequest?.requested_at,
+          status: latestRequest?.status || 'unknown',
+        };
+      });
+
+      console.log('Active Patients:', activePatients);
+      setActivePatients(activePatients);
     } catch (error) {
       console.error('Error fetching active patients:', error);
     }
@@ -171,22 +170,20 @@ export const ProfessionalDashboard = () => {
 
   // Fetch upcoming consultations (appointments)
   const getUpcomingAppointments = async () => {
-    if (!user?.id) return console.warn('User ID not available yet.');
-
     try {
+      const storedCode = localStorage.getItem('professionalCode');
+      if (!storedCode) {
+        console.error('No professional code found');
+        return;
+      }
+
+      // Use professional_code for filtering since that's how requests are stored
       const { data, error } = await supabase
         .from('consultation_requests')
         .select(
-          `
-        id,
-        consultation_reason,
-        status,
-        requested_at,
-        consultation_fee,
-        profiles:patient_id (first_name, last_name, phone)
-      `
+          'id, consultation_reason, status, requested_at, consultation_fee, patient_id'
         )
-        .eq('professional_id', user.id)
+        .eq('professional_code', storedCode)
         .in('status', ['pending', 'scheduled'])
         .order('requested_at', { ascending: true });
 
@@ -200,29 +197,17 @@ export const ProfessionalDashboard = () => {
   };
 
   const getCompletedReports = async () => {
-    if (!user?.id) return console.warn('User ID not available yet.');
-
     try {
-      const { data, error } = await supabase
-        .from('consultation_summaries')
-        .select(
-          `
-        id,
-        teleconsultation_id,
-        doctor_notes,
-        prescription,
-        recommendations,
-        duration_minutes,
-        created_at
-      `
-        )
-        // Optional: join teleconsultation for context
-        .order('created_at', { ascending: false });
+      const storedCode = localStorage.getItem('professionalCode');
+      if (!storedCode) {
+        console.error('No professional code found');
+        return;
+      }
 
-      if (error) throw error;
-
-      console.log('Completed Reports:', data);
-      setReports(data || []);
+      // For now, just set empty reports since we don't have proper RLS setup
+      // TODO: Set up proper RLS policies for consultation_summaries
+      console.log('Skipping reports due to RLS restrictions');
+      setReports([]);
     } catch (error) {
       console.error('Error fetching reports:', error);
     }
@@ -264,18 +249,6 @@ export const ProfessionalDashboard = () => {
     status: patient.status || 'stable',
   }));
   const isMobile = useIsMobile();
-
-  interface Patient {
-    id: string;
-    name: string;
-    lastConsultation: string;
-    nextAppointment?: string;
-    notes?: string;
-    status?: string;
-    diabetesType?: string;
-    lastGlucose?: string;
-  }
-
   const patients: Patient[] = [
     {
       id: '1',
@@ -678,7 +651,23 @@ export const ProfessionalDashboard = () => {
                 </Card>
                 <div className="flex flex-col gap-6">
                   {/* Quick Actions */}
-
+                  {/* <Card
+                    className={
+                      theme === 'dark'
+                        ? 'bg-gray-800/80 border-white/10 h-fit'
+                        : 'h-fit'
+                    }
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Stethoscope className="h-5 w-5 mr-2" />
+                        {t('professionalDashboard.overview.quickActions.title')}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <QuickActions />
+                    </CardContent>
+                  </Card> */}
                   {/* Notes des patients */}
                   <Card>
                     <CardHeader>

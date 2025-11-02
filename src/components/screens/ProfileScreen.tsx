@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   User,
   Phone,
@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 import { Profile, useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,8 @@ import { useThemeStore } from '@/store/useThemeStore';
 import { EmergencyContactModal } from '../modals/EmergencyContactModal';
 import { useMedications } from '@/contexts/MedicationContext';
 import { AddEmergencyContactModal } from '../modals/AddEmergencyContactModal';
+import { uploadToCloudinary } from '@/utils/cloudinary';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProfileScreen = () => {
   const { t } = useTranslation();
@@ -41,7 +44,15 @@ const ProfileScreen = () => {
   const [notifications, setNotifications] = useState(true);
   const [dataSharing, setDataSharing] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(
+    (profile as any)?.profile_photo_url || null
+  );
+
+  useEffect(() => {
+    if (profile?.id) {
+      setProfilePhoto((profile as any)?.profile_photo_url || null);
+    }
+  }, [profile]);
   const [weight, setWeight] = useState<number>(75.2);
   type FormType = Partial<Profile> & { diabetes_type?: string };
 
@@ -64,11 +75,76 @@ const ProfileScreen = () => {
   });
 
   const { medications, loading: medsLoading } = useMedications();
+  const [medicalTeam, setMedicalTeam] = useState([]);
+  const [teamLoading, setTeamLoading] = useState(false);
 
   const { theme, toggleTheme } = useThemeStore();
   const isDark = theme === 'dark';
 
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const fetchMedicalTeam = async () => {
+    setTeamLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('professional_applications')
+        .select('first_name, last_name, professional_type, email, phone')
+        .eq('status', 'approved')
+        .limit(10);
+
+      if (error) throw error;
+      setMedicalTeam(data || []);
+    } catch (error) {
+      console.error('Error fetching medical team:', error);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMedicalTeam();
+  }, []);
+
+  const handlePhotoUpload = async (file: File) => {
+    setUploadingPhoto(true);
+    try {
+      const imageUrl = await uploadToCloudinary(file);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ profile_photo_url: imageUrl })
+        .eq('id', profile.id);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      setProfilePhoto(imageUrl);
+      toast.success('Photo updated successfully');
+    } catch (error) {
+      toast.error('Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ profile_photo_url: null })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfilePhoto(null);
+      toast.success('Photo removed successfully');
+    } catch (error) {
+      toast.error('Failed to remove photo');
+    }
+  };
 
   if (!profile) {
     return <div className="p-4">{t('profileScreen.loading')}</div>;
@@ -115,7 +191,7 @@ const ProfileScreen = () => {
         <div className="relative">
           <PhotoUploadModal
             currentPhoto={profilePhoto}
-            onPhotoChange={setProfilePhoto}
+            onPhotoChange={handlePhotoUpload}
           >
             <Avatar className="w-24 h-24 mx-auto bg-gradient-to-br from-gray-400 to-gray-600 cursor-pointer hover:opacity-80 transition-opacity">
               {profilePhoto ? (
@@ -130,18 +206,27 @@ const ProfileScreen = () => {
           </PhotoUploadModal>
           <Button
             size="sm"
-            className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+            className="absolute -bottom-2 -left-2 h-8 w-8 rounded-full p-0"
             asChild
           >
             <PhotoUploadModal
               currentPhoto={profilePhoto}
-              onPhotoChange={setProfilePhoto}
+              onPhotoChange={handlePhotoUpload}
             >
-              <span>
-                <Camera className="w-4 h-4" />
-              </span>
+              <Camera className="w-4 h-4" />
+              {/* <span></span> */}
             </PhotoUploadModal>
           </Button>
+          {profilePhoto && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="absolute -bottom-2 -right-2 h-6 w-6 rounded-full p-0"
+              onClick={handleRemovePhoto}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -174,7 +259,6 @@ const ProfileScreen = () => {
           </div>
         </div>
       </div>
-
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center p-3">
@@ -209,7 +293,6 @@ const ProfileScreen = () => {
           </CardContent>
         </Card>
       </div>
-
       {/* Personal Info */}
       <Card className="border-l-4 border-l-medical-teal">
         <div className="flex justify-between items-center w-full">
@@ -280,7 +363,6 @@ const ProfileScreen = () => {
           </div>
         </CardContent>
       </Card>
-
       <Card className="border-l-4 border-l-medical-teal">
         <div className="flex justify-between items-center w-full">
           <CardHeader className="flex justify-between">
@@ -331,8 +413,7 @@ const ProfileScreen = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Équipe Médicale */}
+      {/* Équipe Médicale */} {/* Médical team */}
       <Card className="border-l-4 border-l-medical-teal">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -341,40 +422,37 @@ const ProfileScreen = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <div className="font-medium">Dr. Mamadou Kane</div>
-            <div className="text-sm text-muted-foreground">
-              {t('profileScreen.doctor')}
-            </div>
-            <div className="text-sm">📞 +221 33 825 14 52</div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <div className="font-medium">CHU Aristide Le Dantec</div>
-            <div className="text-sm text-muted-foreground">
-              {t('profileScreen.followUpCenter')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              📍 Dakar, Sénégal
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <div className="font-medium">Dr. Aminata Sow</div>
-            <div className="text-sm text-muted-foreground">
-              {t('profileScreen.consultant')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              🏥 Polyclinique du Point E
-            </div>
-          </div>
+          {teamLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Loading medical team...
+            </p>
+          ) : medicalTeam.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No medical professionals available
+            </p>
+          ) : (
+            medicalTeam.map((professional, index) => (
+              <div key={index}>
+                <div className="space-y-2 pb-2">
+                  <div className="font-medium">
+                    Dr. {professional.first_name} {professional.last_name}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {professional.professional_type}
+                  </div>
+                  {professional.phone && (
+                    <div className="text-sm">📞 {professional.phone}</div>
+                  )}
+                  {professional.email && (
+                    <div className="text-sm">✉️ {professional.email}</div>
+                  )}
+                </div>
+                {index < medicalTeam.length - 1 && <Separator />}
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
-
       {/* Current Treatment */}
       <Card className="border-l-4 border-l-medical-teal">
         <CardHeader>
@@ -390,7 +468,7 @@ const ProfileScreen = () => {
           ) : medications.length === 0 ? (
             <p className="text-sm text-muted-foreground">No medications set</p>
           ) : (
-            medications.map(med => (
+            medications.slice(0, 10).map(med => (
               <div key={med.id}>
                 <span className="text-muted-foreground text-sm">
                   {med.medication_name} • {med.dose}
@@ -411,7 +489,6 @@ const ProfileScreen = () => {
           )}
         </CardContent>
       </Card>
-
       {/* Energency Contact */}
       <Card className="border-l-4 border-l-red-500 bg-red-50">
         <div className="flex justify-between items-start w-full">
@@ -511,7 +588,6 @@ const ProfileScreen = () => {
           </div>
         </CardContent>
       </Card>
-
       {/* Settings */}
       <Card className="border-l-4 border-l-medical-teal">
         <CardHeader>
@@ -571,7 +647,6 @@ const ProfileScreen = () => {
           </div>
         </CardContent>
       </Card>
-
       {/* Boutons Actions */}
       <div className="space-y-3">
         <Button variant="outline" className="w-full">
