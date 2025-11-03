@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -61,10 +61,13 @@ import {
   SimpleGrid,
   Select,
 } from '@chakra-ui/react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Patient {
   id: string;
   name: string;
+  phone?: string;
   lastConsultation: string;
   nextAppointment?: string;
   notes: string;
@@ -85,13 +88,14 @@ interface Consultation {
 
 export const PatientManagement = () => {
   const { t } = useTranslation();
+  const { professionalCode } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date()
   );
   const [isPatientCodeModalOpen, setIsPatientCodeModalOpen] = useState(false);
   const [patientCode, setPatientCode] = useState('');
   const [selectedAction, setSelectedAction] = useState<{
-    type: 'view' | 'message' | 'teleconsultation' | 'call' | 'edit';
+    type: 'view' | 'message' | 'teleconsultation' | 'call';
     patientId: string;
     patientName: string;
   } | null>(null);
@@ -101,14 +105,16 @@ export const PatientManagement = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [isTeleconsultationOpen, setIsTeleconsultationOpen] = useState(false);
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [callNotes, setCallNotes] = useState('');
   const [activePatient, setActivePatient] = useState<Patient | null>(null);
   const [patientsCurrentPage, setPatientsCurrentPage] = useState(1);
   const [consultationsCurrentPage, setConsultationsCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const handlePatientAction = (
-    action: 'view' | 'message' | 'teleconsultation' | 'call' | 'edit',
+    action: 'view' | 'message' | 'teleconsultation' | 'call',
     patientId: string,
     patientName: string
   ) => {
@@ -140,9 +146,6 @@ export const PatientManagement = () => {
       case 'call':
         setIsCallModalOpen(true);
         break;
-      case 'edit':
-        setIsEditModalOpen(true);
-        break;
     }
 
     // Fermer le modal de code patient
@@ -157,47 +160,98 @@ export const PatientManagement = () => {
   const consultationsStartIndex = (consultationsCurrentPage - 1) * itemsPerPage;
   const consultationsEndIndex = consultationsStartIndex + itemsPerPage;
 
-  // Données de démo
-  const patients: Patient[] = [
-    {
-      id: '1',
-      name: 'Marie Dubois',
-      lastConsultation: '2024-01-15',
-      nextAppointment: '2024-01-22',
-      notes: t('professionalDashboard.patients.recentNotes.people.first'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.first'),
-      diabetesType: 'Type 2',
-      lastGlucose: '7.2 mmol/L',
-    },
-    {
-      id: '2',
-      name: 'Pierre Martin',
-      lastConsultation: '2024-01-14',
-      notes: t('professionalDashboard.patients.recentNotes.people.second'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.second'),
-      diabetesType: 'Type 1',
-      lastGlucose: '6.8 mmol/L',
-    },
-    {
-      id: '3',
-      name: 'Sophie Laurent',
-      lastConsultation: '2024-01-12',
-      nextAppointment: '2024-01-19',
-      notes: t('professionalDashboard.patients.recentNotes.people.third'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.third'),
-      diabetesType: 'Type 2',
-      lastGlucose: '8.1 mmol/L',
-    },
-    {
-      id: '4',
-      name: 'Jean Bernard',
-      lastConsultation: '2024-01-10',
-      notes: t('professionalDashboard.patients.recentNotes.people.fourth'),
-      status: t('professionalDashboard.patients.lastBloodGlucose.fourth'),
-      diabetesType: 'Type 2',
-      lastGlucose: '7.5 mmol/L',
-    },
-  ];
+  const handleCompleteCall = async () => {
+    if (!activePatient || !professionalCode) return;
+
+    try {
+      // Update consultation request status to completed
+      const { error } = await supabase
+        .from('consultation_requests')
+        .update({
+          status: 'completed',
+          professional_response: callNotes || 'Call completed',
+        })
+        .eq('patient_id', activePatient.id)
+        .eq('professional_code', professionalCode);
+
+      if (error) throw error;
+
+      // Update local patient status
+      setPatients(prev =>
+        prev.map(p =>
+          p.id === activePatient.id ? { ...p, status: 'Completed' } : p
+        )
+      );
+
+      setIsCallModalOpen(false);
+      setCallNotes('');
+      setActivePatient(null);
+    } catch (error) {
+      console.error('Error completing call:', error);
+    }
+  };
+
+  const fetchPatients = async () => {
+    if (!professionalCode) return;
+
+    setLoading(true);
+    try {
+      const { data: requests, error } = await supabase
+        .from('consultation_requests')
+        .select('patient_id, requested_at')
+        .eq('professional_code', professionalCode);
+
+      if (error) throw error;
+
+      const patientIds = [...new Set(requests?.map(r => r.patient_id) || [])];
+
+      if (patientIds.length === 0) {
+        setPatients([]);
+        return;
+      }
+
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, phone')
+        .in('user_id', patientIds);
+
+      if (profileError) throw profileError;
+
+      const activePatients =
+        profiles?.map(patient => {
+          const latestRequest = requests
+            ?.filter(req => req.patient_id === patient.user_id)
+            .sort(
+              (a, b) =>
+                new Date(b.requested_at).getTime() -
+                new Date(a.requested_at).getTime()
+            )[0];
+
+          return {
+            id: patient.user_id,
+            name: `${patient.first_name} ${patient.last_name}`,
+            phone: patient.phone || 'N/A',
+            lastConsultation:
+              latestRequest?.requested_at || new Date().toISOString(),
+            notes: 'Patient suivi via consultation',
+            status:
+              latestRequest?.status === 'completed' ? 'Completed' : 'Pending',
+            diabetesType: 'Type 2',
+            lastGlucose: '7.2 mmol/L',
+          };
+        }) || [];
+
+      setPatients(activePatients);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, [professionalCode]);
 
   const paginatedPatients = patients.slice(
     patientsStartIndex,
@@ -325,15 +379,15 @@ export const PatientManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Patient</TableHead>
-                    <TableHead>
-                      {t('professionalDashboard.patients.title')}
-                    </TableHead>
+                    {/* <TableHead>Patient</TableHead> */}
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.first')}
                     </TableHead>
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.second')}
+                    </TableHead>
+                    <TableHead>
+                      {t('professionalDashboard.patients.tableHeading.third')}
                     </TableHead>
                     <TableHead>
                       {t('professionalDashboard.patients.tableHeading.fourth')}
@@ -344,111 +398,123 @@ export const PatientManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedPatients.map(patient => (
-                    <TableRow key={patient.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {patient.name
-                                .split(' ')
-                                .map(n => n[0])
-                                .join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{patient.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {patient.nextAppointment &&
-                                `Prochain RDV: ${new Date(
-                                  patient.nextAppointment
-                                ).toLocaleDateString('fr-FR')}`}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{patient.diabetesType}</TableCell>
-                      <TableCell>
-                        {new Date(patient.lastConsultation).toLocaleDateString(
-                          'fr-FR'
-                        )}
-                      </TableCell>
-                      <TableCell>{patient.lastGlucose}</TableCell>
-                      <TableCell>{getStatusBadge(patient.status)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 hover:bg-accent"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="z-[100] min-w-48 bg-background border border-border shadow-md rounded-md p-1"
-                            side="bottom"
-                            sideOffset={4}
-                          >
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'view',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.first'
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'message',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <MessageSquare className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.second'
-                              )}
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'edit',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.fifth'
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Chargement des patients...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : paginatedPatients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Aucun patient trouvé
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedPatients.map(patient => (
+                      <TableRow key={patient.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                {patient.name
+                                  .split(' ')
+                                  .map(n => n[0])
+                                  .join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{patient.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {patient.nextAppointment &&
+                                  `Prochain RDV: ${new Date(
+                                    patient.nextAppointment
+                                  ).toLocaleDateString('fr-FR')}`}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{patient.diabetesType}</TableCell>
+                        <TableCell>
+                          {new Date(
+                            patient.lastConsultation
+                          ).toLocaleDateString('fr-FR')}
+                        </TableCell>
+                        <TableCell>{patient.lastGlucose}</TableCell>
+                        <TableCell>{getStatusBadge(patient.status)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 hover:bg-accent"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="z-[100] min-w-48 bg-background border border-border shadow-md rounded-md p-1"
+                              side="bottom"
+                              sideOffset={4}
+                            >
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'view',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                {t(
+                                  'professionalDashboard.patients.dropdownOptions.first'
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'message',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                {t(
+                                  'professionalDashboard.patients.dropdownOptions.second'
+                                )}
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'call',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <Phone className="mr-2 h-4 w-4" />
+                                Book a Call
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
 
@@ -674,12 +740,25 @@ export const PatientManagement = () => {
                   {t('professionalDashboard.patients.calendarScreen.title')}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
-                  className="rounded-md border"
+                  className="w-full"
+                  classNames={{
+                    months:
+                      'flex w-full flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0 flex-1',
+                    month: 'space-y-4 w-full flex flex-col',
+                    table: 'w-full border-collapse',
+                    head_row: 'flex w-full text-center',
+                    head_cell:
+                      'text-muted-foreground rounded-md w-8 font-normal text-[0.8rem] flex-1 text-center',
+                    row: 'flex w-full mt-2',
+                    cell: 'relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1',
+                    day: 'h-8 w-8 p-0 font-normal aria-selected:opacity-100 mx-auto text-center',
+                    day_today: 'bg-primary text-primary-foreground font-semibold relative after:content-[""] after:absolute after:top-0 after:right-0 after:w-2 after:h-2 after:bg-red-500 after:rounded-full',
+                  }}
                 />
               </CardContent>
             </Card>
@@ -1076,166 +1155,44 @@ export const PatientManagement = () => {
 
             <div>
               <p className="font-medium text-lg">{activePatient?.name}</p>
-              <p className="text-muted-foreground">
-                {t('patientManagement.call.ready')}
+              <p className="text-sm text-muted-foreground">
+                Phone: {activePatient?.phone}
               </p>
+              <p className="text-muted-foreground">Ready to call</p>
             </div>
 
             <div>
-              <Label htmlFor="phone-notes">
-                {t('patientManagement.call.notesLabel')}
-              </Label>
+              <Label htmlFor="phone-notes">Call Notes</Label>
               <Textarea
                 id="phone-notes"
-                placeholder={t('patientManagement.call.notesPlaceholder')}
+                placeholder="Add notes about the call..."
                 className="min-h-20"
+                value={callNotes}
+                onChange={e => setCallNotes(e.target.value)}
               />
             </div>
 
             <div className="flex justify-center space-x-2">
               <Button
                 variant="outline"
-                onClick={() => setIsCallModalOpen(false)}
+                onClick={() => {
+                  setIsCallModalOpen(false);
+                  setCallNotes('');
+                }}
               >
-                {t('patientManagement.call.cancel')}
+                Cancel
               </Button>
-              <Button className="bg-green-600 hover:bg-green-700">
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleCompleteCall}
+              >
                 <Phone className="mr-2 h-4 w-4" />
-                {t('patientManagement.call.dial')}
+                Complete Call
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Modal Édition du profil */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        size="2xl"
-        scrollBehavior="inside"
-      >
-        <ModalOverlay />
-        <ModalContent borderRadius="xl" p={4}>
-          <ModalHeader>
-            {t('patientManagement.editProfile.title', {
-              patientName: activePatient?.name,
-            })}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <p className="text-gray-500 mb-4">
-              {t('patientManagement.editProfile.description')}
-            </p>
-
-            {activePatient && (
-              <div className="space-y-4">
-                {/* Name and Diabetes Type */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormControl>
-                    <FormLabel htmlFor="edit-name">
-                      {t('patientManagement.editProfile.name')}
-                    </FormLabel>
-                    <Input
-                      id="edit-name"
-                      defaultValue={activePatient.name}
-                      focusBorderColor="blue.500"
-                    />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel htmlFor="edit-diabetes-type">
-                      {t('patientManagement.editProfile.diabetesType')}
-                    </FormLabel>
-                    <Input
-                      id="edit-diabetes-type"
-                      defaultValue={activePatient.diabetesType}
-                      focusBorderColor="blue.500"
-                    />
-                  </FormControl>
-                </div>
-
-                {/* Status */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-status">
-                    {t('patientManagement.editProfile.status')}
-                  </FormLabel>
-                  <Select
-                    id="edit-status"
-                    defaultValue={activePatient.status}
-                    focusBorderColor="blue.500"
-                  >
-                    <option value="stable">
-                      {t('patientManagement.editProfile.statusOptions.stable')}
-                    </option>
-                    <option value="attention">
-                      {t(
-                        'patientManagement.editProfile.statusOptions.attention'
-                      )}
-                    </option>
-                    <option value="amélioration">
-                      {t(
-                        'patientManagement.editProfile.statusOptions.improving'
-                      )}
-                    </option>
-                  </Select>
-                </FormControl>
-
-                {/* Glucose */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-glucose">
-                    {t('patientManagement.editProfile.lastGlucose')}
-                  </FormLabel>
-                  <Input
-                    id="edit-glucose"
-                    defaultValue={activePatient.lastGlucose}
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-
-                {/* Notes */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-notes">
-                    {t('patientManagement.editProfile.notes')}
-                  </FormLabel>
-                  <Textarea
-                    id="edit-notes"
-                    defaultValue={activePatient.notes}
-                    minH="120px"
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-
-                {/* Next Appointment */}
-                <FormControl>
-                  <FormLabel htmlFor="edit-next-appointment">
-                    {t('patientManagement.editProfile.nextAppointment')}
-                  </FormLabel>
-                  <Input
-                    id="edit-next-appointment"
-                    type="date"
-                    defaultValue={activePatient.nextAppointment}
-                    focusBorderColor="blue.500"
-                  />
-                </FormControl>
-              </div>
-            )}
-          </ModalBody>
-
-          <ModalFooter>
-            <Button
-              variant="outline"
-              mr={3}
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              {t('patientManagement.editProfile.cancel')}
-            </Button>
-            <Button colorScheme="blue">
-              {t('patientManagement.editProfile.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 };

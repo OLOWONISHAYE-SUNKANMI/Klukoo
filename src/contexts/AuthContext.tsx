@@ -198,6 +198,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, metadata?: any) => {
+    // Check if profile already exists with this email
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    // console.log('Existing profile check:', existingProfile);
+
+    if (existingProfile) {
+      return {
+        error: { message: 'User already registered' },
+        needsSubscription: false,
+      };
+    }
+
     const redirectUrl = `${window.location.origin}/`;
 
     const { data, error } = await supabase.auth.signUp({
@@ -208,6 +224,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: metadata,
       },
     });
+
+    console.log('SignUp Result:', data, error);
 
     // For patient signups, indicate that subscription selection is needed
     const needsSubscription = metadata?.user_type === 'patient';
