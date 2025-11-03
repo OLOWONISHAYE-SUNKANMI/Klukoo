@@ -162,14 +162,14 @@ export const PatientManagement = () => {
 
   const handleCompleteCall = async () => {
     if (!activePatient || !professionalCode) return;
-    
+
     try {
       // Update consultation request status to completed
       const { error } = await supabase
         .from('consultation_requests')
-        .update({ 
+        .update({
           status: 'completed',
-          professional_response: callNotes || 'Call completed'
+          professional_response: callNotes || 'Call completed',
         })
         .eq('patient_id', activePatient.id)
         .eq('professional_code', professionalCode);
@@ -177,11 +177,11 @@ export const PatientManagement = () => {
       if (error) throw error;
 
       // Update local patient status
-      setPatients(prev => prev.map(p => 
-        p.id === activePatient.id 
-          ? { ...p, status: 'Completed' }
-          : p
-      ));
+      setPatients(prev =>
+        prev.map(p =>
+          p.id === activePatient.id ? { ...p, status: 'Completed' } : p
+        )
+      );
 
       setIsCallModalOpen(false);
       setCallNotes('');
@@ -193,7 +193,7 @@ export const PatientManagement = () => {
 
   const fetchPatients = async () => {
     if (!professionalCode) return;
-    
+
     setLoading(true);
     try {
       const { data: requests, error } = await supabase
@@ -204,7 +204,7 @@ export const PatientManagement = () => {
       if (error) throw error;
 
       const patientIds = [...new Set(requests?.map(r => r.patient_id) || [])];
-      
+
       if (patientIds.length === 0) {
         setPatients([]);
         return;
@@ -217,22 +217,29 @@ export const PatientManagement = () => {
 
       if (profileError) throw profileError;
 
-      const activePatients = profiles?.map(patient => {
-        const latestRequest = requests
-          ?.filter(req => req.patient_id === patient.user_id)
-          .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())[0];
-        
-        return {
-          id: patient.user_id,
-          name: `${patient.first_name} ${patient.last_name}`,
-          phone: patient.phone || 'N/A',
-          lastConsultation: latestRequest?.requested_at || new Date().toISOString(),
-          notes: 'Patient suivi via consultation',
-          status: latestRequest?.status === 'completed' ? 'Completed' : 'Pending',
-          diabetesType: 'Type 2',
-          lastGlucose: '7.2 mmol/L',
-        };
-      }) || [];
+      const activePatients =
+        profiles?.map(patient => {
+          const latestRequest = requests
+            ?.filter(req => req.patient_id === patient.user_id)
+            .sort(
+              (a, b) =>
+                new Date(b.requested_at).getTime() -
+                new Date(a.requested_at).getTime()
+            )[0];
+
+          return {
+            id: patient.user_id,
+            name: `${patient.first_name} ${patient.last_name}`,
+            phone: patient.phone || 'N/A',
+            lastConsultation:
+              latestRequest?.requested_at || new Date().toISOString(),
+            notes: 'Patient suivi via consultation',
+            status:
+              latestRequest?.status === 'completed' ? 'Completed' : 'Pending',
+            diabetesType: 'Type 2',
+            lastGlucose: '7.2 mmol/L',
+          };
+        }) || [];
 
       setPatients(activePatients);
     } catch (error) {
@@ -406,105 +413,105 @@ export const PatientManagement = () => {
                   ) : (
                     paginatedPatients.map(patient => (
                       <TableRow key={patient.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {patient.name
-                                .split(' ')
-                                .map(n => n[0])
-                                .join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{patient.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {patient.nextAppointment &&
-                                `Prochain RDV: ${new Date(
-                                  patient.nextAppointment
-                                ).toLocaleDateString('fr-FR')}`}
-                            </p>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                {patient.name
+                                  .split(' ')
+                                  .map(n => n[0])
+                                  .join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{patient.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {patient.nextAppointment &&
+                                  `Prochain RDV: ${new Date(
+                                    patient.nextAppointment
+                                  ).toLocaleDateString('fr-FR')}`}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{patient.diabetesType}</TableCell>
-                      <TableCell>
-                        {new Date(patient.lastConsultation).toLocaleDateString(
-                          'fr-FR'
-                        )}
-                      </TableCell>
-                      <TableCell>{patient.lastGlucose}</TableCell>
-                      <TableCell>{getStatusBadge(patient.status)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu modal={false}>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 hover:bg-accent"
+                        </TableCell>
+                        <TableCell>{patient.diabetesType}</TableCell>
+                        <TableCell>
+                          {new Date(
+                            patient.lastConsultation
+                          ).toLocaleDateString('fr-FR')}
+                        </TableCell>
+                        <TableCell>{patient.lastGlucose}</TableCell>
+                        <TableCell>{getStatusBadge(patient.status)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 hover:bg-accent"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="z-[100] min-w-48 bg-background border border-border shadow-md rounded-md p-1"
+                              side="bottom"
+                              sideOffset={4}
                             >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="z-[100] min-w-48 bg-background border border-border shadow-md rounded-md p-1"
-                            side="bottom"
-                            sideOffset={4}
-                          >
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'view',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.first'
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'message',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <MessageSquare className="mr-2 h-4 w-4" />
-                              {t(
-                                'professionalDashboard.patients.dropdownOptions.second'
-                              )}
-                            </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'view',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                {t(
+                                  'professionalDashboard.patients.dropdownOptions.first'
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'message',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                {t(
+                                  'professionalDashboard.patients.dropdownOptions.second'
+                                )}
+                              </DropdownMenuItem>
 
-                            <DropdownMenuItem
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handlePatientAction(
-                                  'call',
-                                  patient.id,
-                                  patient.name
-                                );
-                              }}
-                            >
-                              <Phone className="mr-2 h-4 w-4" />
-                              Book a Call
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                              <DropdownMenuItem
+                                className="cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1.5 text-sm"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePatientAction(
+                                    'call',
+                                    patient.id,
+                                    patient.name
+                                  );
+                                }}
+                              >
+                                <Phone className="mr-2 h-4 w-4" />
+                                Book a Call
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -733,12 +740,25 @@ export const PatientManagement = () => {
                   {t('professionalDashboard.patients.calendarScreen.title')}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
-                  className="rounded-md border"
+                  className="w-full"
+                  classNames={{
+                    months:
+                      'flex w-full flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0 flex-1',
+                    month: 'space-y-4 w-full flex flex-col',
+                    table: 'w-full border-collapse',
+                    head_row: 'flex w-full text-center',
+                    head_cell:
+                      'text-muted-foreground rounded-md w-8 font-normal text-[0.8rem] flex-1 text-center',
+                    row: 'flex w-full mt-2',
+                    cell: 'relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1',
+                    day: 'h-8 w-8 p-0 font-normal aria-selected:opacity-100 mx-auto text-center',
+                    day_today: 'bg-primary text-primary-foreground font-semibold relative after:content-[""] after:absolute after:top-0 after:right-0 after:w-2 after:h-2 after:bg-red-500 after:rounded-full',
+                  }}
                 />
               </CardContent>
             </Card>
@@ -1138,21 +1158,17 @@ export const PatientManagement = () => {
               <p className="text-sm text-muted-foreground">
                 Phone: {activePatient?.phone}
               </p>
-              <p className="text-muted-foreground">
-                Ready to call
-              </p>
+              <p className="text-muted-foreground">Ready to call</p>
             </div>
 
             <div>
-              <Label htmlFor="phone-notes">
-                Call Notes
-              </Label>
+              <Label htmlFor="phone-notes">Call Notes</Label>
               <Textarea
                 id="phone-notes"
                 placeholder="Add notes about the call..."
                 className="min-h-20"
                 value={callNotes}
-                onChange={(e) => setCallNotes(e.target.value)}
+                onChange={e => setCallNotes(e.target.value)}
               />
             </div>
 
@@ -1166,7 +1182,7 @@ export const PatientManagement = () => {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 className="bg-green-600 hover:bg-green-700"
                 onClick={handleCompleteCall}
               >
@@ -1177,8 +1193,6 @@ export const PatientManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-
     </div>
   );
 };
