@@ -26,7 +26,6 @@ import {
   X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-
 import PredictiveCard from '../ui/PredictiveCard';
 import { useTranslation } from 'react-i18next';
 import NativeHeader from '../ui/NativeHeader';
@@ -167,7 +166,7 @@ export default function PredictiveAlertScreen({ values }: any) {
     setCarbs(0);
     setActivity(0);
   };
-  const latestCarb = meals[0].total_carbs;
+  const latestCarb = meals?.[0]?.total_carbs || 0;
 
   const checkAlerts = predictedValue => {
     const newAlerts = [];
