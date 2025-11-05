@@ -143,23 +143,35 @@ export const ProfessionalDashboard = () => {
       if (error) throw error;
       console.log('patients:', patients);
 
-      // Combine patient data with their latest consultation info
-      const activePatients = patients.map(patient => {
-        const latestRequest = appointments
-          .filter(apt => apt.patient_id === patient.user_id)
-          .sort(
-            (a, b) => new Date(b.requested_at) - new Date(a.requested_at)
-          )[0];
+      // Combine patient data with their latest consultation info and notes
+      const activePatients = await Promise.all(
+        patients.map(async patient => {
+          const latestRequest = appointments
+            .filter(apt => apt.patient_id === patient.user_id)
+            .sort(
+              (a, b) => new Date(b.requested_at) - new Date(a.requested_at)
+            )[0];
 
-        return {
-          id: patient.user_id,
-          first_name: patient.first_name,
-          last_name: patient.last_name,
-          phone: patient.phone || '',
-          last_visit: latestRequest?.requested_at,
-          status: latestRequest?.status || 'unknown',
-        };
-      });
+          // Fetch recent consultation notes for this patient
+          const { data: notes } = await supabase
+            .from('consultation_notes')
+            .select('notes')
+            .eq('patient_id', patient.user_id)
+            .eq('professional_id', user?.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          return {
+            id: patient.user_id,
+            first_name: patient.first_name,
+            last_name: patient.last_name,
+            phone: patient.phone || '',
+            last_visit: latestRequest?.requested_at,
+            status: latestRequest?.status || 'unknown',
+            notes: notes?.[0]?.notes || 'No consultation notes available',
+          };
+        })
+      );
 
       console.log('Active Patients:', activePatients);
       setActivePatients(activePatients);
@@ -678,7 +690,7 @@ export const ProfessionalDashboard = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {patients
+                        {activePatients
                           .filter(p => p.notes)
                           .map(patient => (
                             <div
@@ -686,10 +698,10 @@ export const ProfessionalDashboard = () => {
                               className="p-4 border rounded-lg"
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium">{patient.name}</h4>
+                                <h4 className="font-medium">{`${patient.first_name} ${patient.last_name}`}</h4>
                                 <span className="text-sm text-muted-foreground">
                                   {new Date(
-                                    patient.lastConsultation
+                                    patient.last_visit
                                   ).toLocaleDateString('fr-FR')}
                                 </span>
                               </div>
