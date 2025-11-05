@@ -137,7 +137,7 @@ export default function PredictiveAlertScreen({ values }: any) {
       activity
     );
 
-    console.log('Predicted Glucose Value:', predictedValue);
+    // console.log('Predicted Glucose Value:', predictedValue);
 
     setPrediction(predictedValue);
     checkAlerts(predictedValue);
@@ -229,7 +229,7 @@ export default function PredictiveAlertScreen({ values }: any) {
     };
   }, []);
 
-  console.log(forecast);
+  // console.log(forecast);
 
   const fetchForecast = async () => {
     setLoading(true);
@@ -243,6 +243,7 @@ export default function PredictiveAlertScreen({ values }: any) {
       });
 
       const data = await res.json();
+      // console.log(data);
       setForecast(data.forecast);
     } catch (error) {
       console.error('Error fetching prediction:', error);

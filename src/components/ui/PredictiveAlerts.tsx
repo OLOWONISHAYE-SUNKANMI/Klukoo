@@ -55,17 +55,18 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
         // 🔹 Fetch predictive alert from backend AI
         const aiResponse = await getPredictiveAlert(
           [glucoseValueNum], // glucose history
-          'rapid-acting', // insulinType
-          6, // insulinUnits
-          500, // calories
-          'walking' // activity
+          'fast-acting', // insulinType
+          0, // insulinUnits
+          0, // calories
+          'none' // activity
         );
 
         // 🔹 Format AI alert response
-        const formattedAlerts = aiResponse.alerts.map((alert: any) => ({
+        const formattedAlerts = (aiResponse.alerts || []).map((alert: any) => ({
           id: alert.id || Math.random().toString(36).substring(2, 9),
           type: alert.risk,
-          message: alert.message || aiResponse.main_alert.message,
+          message:
+            alert.message || aiResponse.main_alert?.message || 'No message',
           severity:
             alert.risk === 'Hypo risk'
               ? 'critical'
@@ -80,10 +81,10 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
         // 🔹 Fetch AI-generated summary
         const summaryText = await getAISummary({
           glucoseValue: glucoseValueNum,
-          insulinType: 'rapid-acting',
-          insulinUnits: 6,
-          calories: 500,
-          activity: 'walking',
+          insulinType: 'fast-acting',
+          insulinUnits: 0,
+          calories: 0,
+          activity: 'none',
         });
         setSummary(summaryText);
       } catch (error) {
@@ -197,6 +198,13 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
     }
   }, [glucoseValue, t]);
 
+  // Cleanup toasts on component unmount (logout)
+  useEffect(() => {
+    return () => {
+      toast.dismiss();
+    };
+  }, []);
+
   // --- Glucose statistics logic ---
   const [glucoseStats, setGlucoseStats] = useState({
     total: 0,
@@ -296,7 +304,9 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
           </Alert>
         ))
       ) : (
-        <p className="text-center text-muted">No AI alerts detected.</p>
+        <p className="text-center text-black">
+          No AI alerts detected.
+        </p>
       )}
 
       {/* AI Summary Section */}
