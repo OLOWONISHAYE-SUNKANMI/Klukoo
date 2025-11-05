@@ -27,6 +27,7 @@ const PredictiveCard: React.FC<PredictiveCardProps> = ({
     if (values !== undefined) {
       setValue(values);
     }
+    console.log('PredictiveCard values changed: ', values);
   }, [values]);
 
   useEffect(() => {
