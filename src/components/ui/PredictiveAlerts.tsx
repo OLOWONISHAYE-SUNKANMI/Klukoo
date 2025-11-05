@@ -65,7 +65,8 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
         const formattedAlerts = (aiResponse.alerts || []).map((alert: any) => ({
           id: alert.id || Math.random().toString(36).substring(2, 9),
           type: alert.risk,
-          message: alert.message || aiResponse.main_alert?.message || 'No message',
+          message:
+            alert.message || aiResponse.main_alert?.message || 'No message',
           severity:
             alert.risk === 'Hypo risk'
               ? 'critical'
@@ -303,7 +304,9 @@ const PredictiveAlerts: React.FC<PredictiveAlertsProps> = ({
           </Alert>
         ))
       ) : (
-        <p className="text-center text-muted">No AI alerts detected.</p>
+        <p className="text-center text-black">
+          No AI alerts detected.
+        </p>
       )}
 
       {/* AI Summary Section */}

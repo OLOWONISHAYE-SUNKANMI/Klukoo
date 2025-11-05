@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogOverlay,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -359,9 +360,9 @@ export const PatientManagement = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="patients" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="patients">Patients</TabsTrigger>
-          <TabsTrigger value="planning">Planning</TabsTrigger>
+          {/* <TabsTrigger value="planning">Planning</TabsTrigger> */}
           <TabsTrigger value="calendar">
             {t('professionalDashboard.patients.calendar')}
           </TabsTrigger>
@@ -757,7 +758,8 @@ export const PatientManagement = () => {
                     row: 'flex w-full mt-2',
                     cell: 'relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1',
                     day: 'h-8 w-8 p-0 font-normal aria-selected:opacity-100 mx-auto text-center',
-                    day_today: 'bg-primary text-primary-foreground font-semibold relative after:content-[""] after:absolute after:top-0 after:right-0 after:w-2 after:h-2 after:bg-red-500 after:rounded-full',
+                    day_today:
+                      'bg-primary text-primary-foreground font-semibold relative after:content-[""] after:absolute after:top-0 after:right-0 after:w-2 after:h-2 after:bg-red-500 after:rounded-full',
                   }}
                 />
               </CardContent>
@@ -1135,64 +1137,72 @@ export const PatientManagement = () => {
       </Dialog>
 
       {/* Modal Appel */}
-      <Dialog open={isCallModalOpen} onOpenChange={setIsCallModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {t('patientManagement.call.title', {
-                patientName: activePatient?.name,
-              })}
-            </DialogTitle>
-            <DialogDescription>
+      <Modal
+        isOpen={isCallModalOpen}
+        onClose={() => {
+          setIsCallModalOpen(false);
+          setCallNotes('');
+        }}
+        size="md"
+        isCentered
+      >
+        <ModalOverlay />
+        <ModalContent borderRadius="lg">
+          <ModalHeader>
+            {t('patientManagement.call.title', {
+              patientName: activePatient?.name,
+            })}
+          </ModalHeader>
+          <ModalCloseButton />
+
+          <ModalBody pb={6} textAlign="center">
+            <Text fontSize="sm" color="gray.600" mb={4}>
               {t('patientManagement.call.description')}
-            </DialogDescription>
-          </DialogHeader>
+            </Text>
 
-          <div className="space-y-4 text-center">
-            <div className="mx-auto w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+            <Box mx="auto" w="24" h="24" bg="blue.50" borderRadius="full" display="flex" alignItems="center" justifyContent="center" mb={4}>
               <Phone className="h-8 w-8 text-primary" />
-            </div>
+            </Box>
 
-            <div>
-              <p className="font-medium text-lg">{activePatient?.name}</p>
-              <p className="text-sm text-muted-foreground">
+            <Box mb={4}>
+              <Text fontWeight="medium" fontSize="lg">{activePatient?.name}</Text>
+              <Text fontSize="sm" color="gray.500">
                 Phone: {activePatient?.phone}
-              </p>
-              <p className="text-muted-foreground">Ready to call</p>
-            </div>
+              </Text>
+              <Text color="gray.500">Ready to call</Text>
+            </Box>
 
-            <div>
-              <Label htmlFor="phone-notes">Call Notes</Label>
+            <FormControl>
+              <FormLabel>Call Notes</FormLabel>
               <Textarea
-                id="phone-notes"
                 placeholder="Add notes about the call..."
-                className="min-h-20"
+                minH="20"
                 value={callNotes}
                 onChange={e => setCallNotes(e.target.value)}
               />
-            </div>
+            </FormControl>
+          </ModalBody>
 
-            <div className="flex justify-center space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCallModalOpen(false);
-                  setCallNotes('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={handleCompleteCall}
-              >
-                <Phone className="mr-2 h-4 w-4" />
-                Complete Call
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          <ModalFooter display="flex" justifyContent="center" gap={3}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCallModalOpen(false);
+                setCallNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorScheme="green"
+              onClick={handleCompleteCall}
+            >
+              <Phone className="mr-2 h-4 w-4" />
+              Complete Call
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 };
