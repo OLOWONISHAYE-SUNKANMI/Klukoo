@@ -35,6 +35,10 @@ const Layout = ({
   const { toast } = useToast();
   const { user, signOut, isProfessional, professionalData } = useAuth();
   const [isOpen, setIsOpen] = useState(true);
+  
+  // Check if in family mode
+  const familySession = JSON.parse(localStorage.getItem('family_session') || '{}');
+  const isInFamilyMode = !!familySession.family_member_id;
 
   const handleLogout = async () => {
     await signOut();
@@ -96,7 +100,7 @@ const Layout = ({
                                     <BottomNavigation
                                       activeTab={activeTab}
                                       onTabChange={onTabChange}
-                                      isFamilyMember={isFamilyMember}
+                                      isFamilyMember={isInFamilyMode}
                                     />
                                   </div>
                                 )}

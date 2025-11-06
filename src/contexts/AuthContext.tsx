@@ -84,6 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isTestMode, setIsTestMode] = useState(() => {
     return localStorage.getItem('dare-test-mode') === 'true';
   });
+  const [isFamilyMode, setIsFamilyMode] = useState(() => {
+    return localStorage.getItem('family_auth_mode') === 'true';
+  });
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const [hasSubscription, setHasSubscription] = useState(false);
@@ -173,6 +176,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setHasSubscription(true);
     }
   }, [isTestMode, user]);
+
+  // Handle family mode authentication
+  useEffect(() => {
+    if (isFamilyMode && !user) {
+      const familyUserData = localStorage.getItem('family_user_data');
+      const familySession = localStorage.getItem('family_session');
+      if (familyUserData && familySession) {
+        const familyUser = JSON.parse(familyUserData);
+        const session = JSON.parse(familySession);
+        setUser(familyUser as any);
+        setHasSubscription(true);
+        
+        // Load actual patient's profile for family member
+        getProfile(session.patient_user_id).then(patientProfile => {
+          if (patientProfile) {
+            setProfile(patientProfile);
+          }
+        });
+      }
+    }
+  }, [isFamilyMode, user]);
 
   const checkProfessionalStatus = async (userId: string) => {
     try {
@@ -325,6 +349,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!error) {
       setIsProfessional(false);
       setProfessionalData(null);
+      // Clear family mode
+      localStorage.removeItem('family_auth_mode');
+      localStorage.removeItem('family_user_data');
+      localStorage.removeItem('family_session');
+      setIsFamilyMode(false);
     }
     return { error };
   };

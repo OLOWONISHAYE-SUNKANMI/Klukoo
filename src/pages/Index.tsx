@@ -82,8 +82,21 @@ const Index = () => {
 
   const renderScreen = () => {
     switch (activeTab) {
-      case 'home':
-        return <HomeScreen onTabChange={setActiveTab} />;
+      case 'home': {
+        const familySession = JSON.parse(
+          localStorage.getItem('family_session') || '{}'
+        );
+        console.log(familySession);
+        const isFamilyMode = !!familySession.family_member_id;
+        return (
+          <HomeScreen
+            onTabChange={setActiveTab}
+            isReadOnly={isFamilyMode}
+            familyMemberId={familySession.family_member_id}
+            patientUserId={familySession.patient_user_id}
+          />
+        );
+      }
       case 'doses':
         return (
           <DosesScreen
@@ -140,16 +153,22 @@ const Index = () => {
         );
 
       // Lazy screens
-      case 'charts':
+      case 'charts': {
+        const familySession = JSON.parse(
+          localStorage.getItem('family_session') || '{}'
+        );
+        const isFamilyMode = !!familySession.family_member_id;
+        
         return (
           <Suspense
             fallback={
               <LoadingSpinner fullScreen text={t('index.loading.charts')} />
             }
           >
-            <ChartsScreen />
+            <ChartsScreen isReadOnly={isFamilyMode} />
           </Suspense>
         );
+      }
       case 'blog':
         return (
           <Suspense
@@ -180,7 +199,21 @@ const Index = () => {
             <FamilyScreen />
           </Suspense>
         );
-      case 'chat':
+      case 'chat': {
+        const familySession = JSON.parse(
+          localStorage.getItem('family_session') || '{}'
+        );
+        const isFamilyMode = !!familySession.family_member_id;
+        
+        if (isFamilyMode) {
+          return (
+            <div className="flex-1 p-4 text-center">
+              <h2 className="text-xl font-semibold mb-4">Access Restricted</h2>
+              <p className="text-muted-foreground">Chat is not available in family access mode.</p>
+            </div>
+          );
+        }
+        
         return (
           <Suspense
             fallback={
@@ -190,6 +223,7 @@ const Index = () => {
             <ChatScreen />
           </Suspense>
         );
+      }
       case 'consultation-request':
         return (
           <Suspense

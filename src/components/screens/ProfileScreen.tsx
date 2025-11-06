@@ -41,6 +41,10 @@ import { supabase } from '@/integrations/supabase/client';
 const ProfileScreen = () => {
   const { t } = useTranslation();
   const { profile, signOut, updateProfile } = useAuth();
+  
+  // Check if in family mode for read-only access
+  const familySession = JSON.parse(localStorage.getItem('family_session') || '{}');
+  const isFamilyMode = !!familySession.family_member_id;
   const [notifications, setNotifications] = useState(true);
   const [dataSharing, setDataSharing] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -302,15 +306,17 @@ const ProfileScreen = () => {
               {t('profileScreen.personalInfo')}
             </CardTitle>
           </CardHeader>
-          <CardHeader>
-            <EditProfileModal
-              form={form}
-              loading={loading}
-              handleChange={handleChange}
-              handleUpdateProfile={handleUpdateProfile}
-              trigger={<Pencil className="w-4 h-4 cursor-pointer" />}
-            />
-          </CardHeader>
+          {!isFamilyMode && (
+            <CardHeader>
+              <EditProfileModal
+                form={form}
+                loading={loading}
+                handleChange={handleChange}
+                handleUpdateProfile={handleUpdateProfile}
+                trigger={<Pencil className="w-4 h-4 cursor-pointer" />}
+              />
+            </CardHeader>
+          )}
         </div>
 
         <CardContent className="space-y-3">
@@ -501,59 +507,52 @@ const ProfileScreen = () => {
           </CardHeader>
 
           {/* Right side: edit icon */}
-          <CardHeader className="ml-auto mt-1 flex gap-2 flex-row items-center ">
-            <EmergencyContactModal
-              form={emergencyForm}
-              loading={false}
-              handleChange={(field, value) =>
-                setEmergencyForm(prev => ({ ...prev, [field]: value }))
-              }
-              handleUpdateProfile={async e => {
-                e.preventDefault();
-                const { error } = await updateProfile({
-                  emergency_contact_name: emergencyForm.emergency_contact_name,
-                  emergency_contact_phone:
-                    emergencyForm.emergency_contact_phone,
-                });
-
-                if (!error) {
-                  toast.success('Profile updated successfully');
-                } else {
-                  toast.error('Failed to update profile');
+          {!isFamilyMode && (
+            <CardHeader className="ml-auto mt-1 flex gap-2 flex-row items-center ">
+              <EmergencyContactModal
+                form={emergencyForm}
+                loading={false}
+                handleChange={(field, value) =>
+                  setEmergencyForm(prev => ({ ...prev, [field]: value }))
                 }
+                handleUpdateProfile={async e => {
+                  e.preventDefault();
+                  const { error } = await updateProfile({
+                    emergency_contact_name: emergencyForm.emergency_contact_name,
+                    emergency_contact_phone:
+                      emergencyForm.emergency_contact_phone,
+                  });
 
-                return !error;
-              }}
-              trigger={<Pencil className="w-4 h-4 cursor-pointer" />}
-            />
-            <AddEmergencyContactModal
-              form={addContact}
-              loading={false}
-              handleChange={(field, value) =>
-                setAddConntact(prev => ({ ...prev, [field]: value }))
-              }
-              handleUpdateProfile={async e => {
-                e.preventDefault();
-                // const { error } = await updateProfile({
-                //   emergency_contact_name: addContact.emergency_contact_name,
-                //   emergency_contact_phone: addContact.emergency_contact_phone,
-                // });
+                  if (!error) {
+                    toast.success('Profile updated successfully');
+                  } else {
+                    toast.error('Failed to update profile');
+                  }
 
-                // if (!error) {
-                toast.success('Profile updated successfully');
-                // } else {
-                //   toast.error('Failed to update profile');
-                // }
-                setAddConntact({
-                  emergency_contact_name: '',
-                  emergency_contact_phone: '',
-                });
+                  return !error;
+                }}
+                trigger={<Pencil className="w-4 h-4 cursor-pointer" />}
+              />
+              <AddEmergencyContactModal
+                form={addContact}
+                loading={false}
+                handleChange={(field, value) =>
+                  setAddConntact(prev => ({ ...prev, [field]: value }))
+                }
+                handleUpdateProfile={async e => {
+                  e.preventDefault();
+                  toast.success('Profile updated successfully');
+                  setAddConntact({
+                    emergency_contact_name: '',
+                    emergency_contact_phone: '',
+                  });
 
-                return;
-              }}
-              trigger={<Plus className="w-4 h-4 cursor-pointer" />}
-            />
-          </CardHeader>
+                  return;
+                }}
+                trigger={<Plus className="w-4 h-4 cursor-pointer" />}
+              />
+            </CardHeader>
+          )}
         </div>
 
         {/* Content */}
@@ -649,21 +648,25 @@ const ProfileScreen = () => {
       </Card>
       {/* Boutons Actions */}
       <div className="space-y-3">
-        <Button variant="outline" className="w-full">
-          <User className="w-4 h-4 mr-2" />
-          {t('profileScreen.editProfile')}
-        </Button>
-        <Button variant="outline" className="w-full">
-          <Download className="w-4 h-4 mr-2" />
-          {t('profileScreen.exportData')}
-        </Button>
-        <Button variant="outline" className="w-full">
-          <Shield className="w-4 h-4 mr-2" />
-          {t('profileScreen.privacy')}
-        </Button>
+        {!isFamilyMode && (
+          <>
+            <Button variant="outline" className="w-full">
+              <User className="w-4 h-4 mr-2" />
+              {t('profileScreen.editProfile')}
+            </Button>
+            <Button variant="outline" className="w-full">
+              <Download className="w-4 h-4 mr-2" />
+              {t('profileScreen.exportData')}
+            </Button>
+            <Button variant="outline" className="w-full">
+              <Shield className="w-4 h-4 mr-2" />
+              {t('profileScreen.privacy')}
+            </Button>
+          </>
+        )}
         <Button variant="destructive" className="w-full" onClick={signOut}>
           <LogOut className="w-4 h-4 mr-2" />
-          {t('profileScreen.signOut')}
+          {isFamilyMode ? 'Exit Family Access' : t('profileScreen.signOut')}
         </Button>
       </div>
     </div>

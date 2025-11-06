@@ -347,7 +347,7 @@ const AuthPage = () => {
         return;
       }
 
-      // 3. Store session
+      // 3. Store session and create mock auth (like patient signin)
       const familySession = {
         family_member_id: familyMember.id,
         family_member_name: familyMember.full_name,
@@ -359,16 +359,27 @@ const AuthPage = () => {
         login_time: new Date().toISOString(),
       };
 
-      // console.log(familySession);
-
       localStorage.setItem('family_session', JSON.stringify(familySession));
+      
+      // Create mock session like test mode to trigger auth state
+      localStorage.setItem('family_auth_mode', 'true');
+      localStorage.setItem('family_user_data', JSON.stringify({
+        id: profile.user_id, // Use patient's user_id instead of family prefix
+        email: familyMember.phone,
+        user_metadata: {
+          first_name: familyMember.full_name.split(' ')[0],
+          last_name: familyMember.full_name.split(' ').slice(1).join(' '),
+          family_member: true,
+        },
+      }));
 
       toast({
         title: 'Family Access Granted!',
         description: `Welcome ${familyMember.full_name}! Accessing ${profile.first_name}'s dashboard.`,
       });
 
-      navigate('/family-dashboard');
+      // Force reload to trigger auth context update
+      window.location.href = '/';
     } catch (err: any) {
       console.error('Family login error:', err);
       setError('Login failed. Please try again.');

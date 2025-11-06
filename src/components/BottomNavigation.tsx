@@ -16,32 +16,28 @@ import { useTranslation } from 'react-i18next';
 interface BottomNavigationProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  isFamilyMember?: boolean;
 }
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
   onTabChange,
+  isFamilyMember = false,
 }) => {
   const { t } = useTranslation();
 
-  const tabs = [
+  const allTabs = [
     { id: 'home', label: t('nav.home'), icon: Home, color: 'teal' },
     { id: 'charts', label: t('nav.charts'), icon: BarChart3, color: 'orange' },
     { id: 'journal', label: t('nav.journal'), icon: FileText, color: 'coral' },
     { id: 'predictive', label: 'AI alert', icon: Brain, color: 'orange' },
-    // {
-    //   id: 'consultation-request',
-    //   label: t('nav.teleconsultation'),
-    //   icon: Stethoscope,
-    //   color: 'teal',
-    // },
-    // { id: 'family', label: t('nav.family'), icon: Users, color: 'green' },
-    // { id: 'chat', label: t('nav.chat'), icon: MessageCircle, color: 'coral' },
-    // { id: 'blog', label: t('nav.blog'), icon: BookOpen, color: 'orange' },
-    // { id: 'insulin', label: 'insulin dosage', icon: PillBottle , color: 'orange' },
-    // { id: 'biomarker', label: 'Biomarker Tracker', icon: Stethoscope, color: 'orange' },
     { id: 'profile', label: t('nav.profile'), icon: User, color: 'teal' },
   ];
+  
+  // Filter tabs for family members - remove restricted ones
+  const tabs = isFamilyMember 
+    ? allTabs.filter(tab => !['journal'].includes(tab.id))
+    : allTabs;
 
   const colorVariants = {
     teal: {

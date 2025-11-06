@@ -37,11 +37,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const { theme } = useThemeStore(); // ✅ zustand theme
   const isDark = theme === 'dark';
 
-  const userName =
-    profile?.first_name ||
-    user?.user_metadata?.first_name ||
-    user?.email ||
-    'Invité';
+  // console.log('HomeScreen Rendered', familyMemberId, patientUserId);
+  // Get display name for family members or regular users
+  const familySession = JSON.parse(localStorage.getItem('family_session') || '{}');
+  const isFamilyMode = !!familySession.family_member_id;
+  
+  const userName = isFamilyMode 
+    ? familySession.patient_name || 'Patient'
+    : profile?.first_name ||
+      user?.user_metadata?.first_name ||
+      user?.email ||
+      'Invité';
 
   const handleAddMeasure = () => {
     if (isReadOnly) {
@@ -121,7 +127,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Predictive Alerts */}
         <div className="px-3 sm:px-4">
           <PredictiveAlerts
-            glucoseValue={glucoseValue}
+            glucoseValue={currentGlucose.toString()}
             onTabChange={onTabChange}
           />
         </div>
