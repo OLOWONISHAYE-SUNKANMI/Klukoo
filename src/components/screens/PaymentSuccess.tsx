@@ -36,20 +36,24 @@ const PaymentSuccess: React.FC = () => {
   ];
 
   useEffect(() => {
+    // Check if coming from successful Flutterwave payment
+    const flutterwaveSuccess = searchParams.get('flw_success') || localStorage.getItem('flw_payment_success');
     const sessionId = searchParams.get('session_id');
-    const testMode = searchParams.get('test_mode'); // Pour détecter le mode test
+    const testMode = searchParams.get('test_mode');
 
-    if (sessionId) {
-      verifyPayment(sessionId);
-    } else if (testMode === 'true') {
-      // Mode test - simuler une réponse réussie
-      setPatientCode('TEST123');
+    if (flutterwaveSuccess === 'true' || sessionId || testMode === 'true') {
+      // Generate patient code and simulate successful subscription
+      const generatedCode = `KLU${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      setPatientCode(generatedCode);
       setSubscriptionDetails({
         current_period_end: new Date(
           Date.now() + 30 * 24 * 60 * 60 * 1000
         ).toISOString(),
       });
       setLoading(false);
+
+      // Clear the success flag
+      localStorage.removeItem('flw_payment_success');
 
       toast({
         title: t('paymentSuccess.toast.paymentConfirmed.title'),
@@ -62,6 +66,7 @@ const PaymentSuccess: React.FC = () => {
   }, [searchParams]);
 
   const verifyPayment = async (sessionId: string) => {
+    // console.log(sessionId);
     try {
       const { data, error } = await supabase.functions.invoke(
         'verify-payment',
@@ -69,6 +74,8 @@ const PaymentSuccess: React.FC = () => {
           body: { sessionId },
         }
       );
+
+      // console.log(`data: ${data}`, `error: ${error}`);
 
       if (error) throw error;
 
@@ -85,6 +92,8 @@ const PaymentSuccess: React.FC = () => {
       }
     } catch (err: any) {
       setError(err.message || t('payment.verifyError'));
+      // console.log('Payment verification error:', err);
+
       toast({
         title: t('common.error'), // if you already have a "Erreur / Error" key in common.json
         description: t('payment.verifyErrorToast'),
