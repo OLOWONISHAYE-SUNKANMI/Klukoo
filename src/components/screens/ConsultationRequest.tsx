@@ -87,6 +87,19 @@ const ConsultationRequest = () => {
       return;
     }
 
+    // Check if professional is available
+    const prof = professionals.find(p => p.id === selectedProfessional);
+
+    if (!prof?.available) {
+      toast({
+        title: 'Professional Unavailable',
+        description:
+          'This professional is currently not available for consultations.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     await submitRequest(
       selectedProfessional,
       consultationReason,
@@ -195,9 +208,11 @@ const ConsultationRequest = () => {
                             {getProfessionalDisplayName(prof.professional_type)}
                           </span>
                         </div>
-                        <Badge variant="outline" className="ml-2">
-                          {rateInfo?.rate || 500} F ({rateInfo?.percentage || 0}
-                          %)
+                        <Badge
+                          variant={prof.available ? 'default' : 'destructive'}
+                          className="ml-2"
+                        >
+                          {prof.available ? 'Available' : 'Unavailable'}
                         </Badge>
                       </div>
                     </SelectItem>
@@ -244,38 +259,28 @@ const ConsultationRequest = () => {
             />
           </div>
 
-          {/* Fee Display */}
+          {/* Professional Availability */}
           {selectedProfessional && (
             <div className="p-4 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-medical-green" />
-                  <span className="font-medium">
-                    {t('consultationRequestFixes.consultationFee')}
-                  </span>
+                  <User className="w-5 h-5 text-medical-green" />
+                  <span className="font-medium">Professional Status</span>
                 </div>
                 <div className="text-right">
                   {(() => {
                     const prof = professionals.find(
                       p => p.id === selectedProfessional
                     );
-                    const rateInfo = prof
-                      ? professionalRates[
-                          prof.professional_type as keyof typeof professionalRates
-                        ]
-                      : null;
                     return (
-                      <>
-                        <p className="font-bold text-medical-green">
-                          {rateInfo?.rate || 500} F CFA
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {t(
-                            'consultationRequestFixes.monthlyPackagePercentage',
-                            { percentage: rateInfo?.percentage || 0 }
-                          )}
-                        </p>
-                      </>
+                      <Badge
+                        variant={prof?.availability ? 'default' : 'destructive'}
+                        className="text-sm"
+                      >
+                        {prof?.availability
+                          ? 'Available Now'
+                          : 'Currently Unavailable'}
+                      </Badge>
                     );
                   })()}
                 </div>
@@ -354,10 +359,6 @@ const ConsultationRequest = () => {
                             {new Date(request.requested_at).toLocaleDateString(
                               'fr-FR'
                             )}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />
-                            {request.consultation_fee} F
                           </span>
                         </div>
                         {request.professional_response && (
