@@ -51,10 +51,15 @@ app.post('/forecast', async (req, res) => {
 
 // ========== PREDICTIVE ALERT ENDPOINT (major improvement) ==========
 app.post('/predict', async (req, res) => {
-  const { glucoseHistory, insulinType, insulinUnits, calories, activity } = req.body;
+  const { glucoseHistory, insulinType, insulinUnits, calories, activity } =
+    req.body;
 
   // Basic input validation
-  if (!glucoseHistory || !Array.isArray(glucoseHistory) || glucoseHistory.length === 0) {
+  if (
+    !glucoseHistory ||
+    !Array.isArray(glucoseHistory) ||
+    glucoseHistory.length === 0
+  ) {
     return res.status(400).json({ error: 'Glucose history is required' });
   }
 
@@ -62,10 +67,15 @@ app.post('/predict', async (req, res) => {
 
   // Precompute expected physiological adjustment
   let adjustment = 0;
-  if (insulinType?.toLowerCase().includes('fast')) adjustment -= insulinUnits * 3;
-  if (insulinType?.toLowerCase().includes('long')) adjustment -= insulinUnits * 1.5;
+  if (insulinType?.toLowerCase().includes('fast'))
+    adjustment -= insulinUnits * 3;
+  if (insulinType?.toLowerCase().includes('long'))
+    adjustment -= insulinUnits * 1.5;
   if (calories > 400) adjustment += 15;
-  if (activity?.toLowerCase().includes('walk') || activity?.toLowerCase().includes('run'))
+  if (
+    activity?.toLowerCase().includes('walk') ||
+    activity?.toLowerCase().includes('run')
+  )
     adjustment -= 10;
 
   const approxForecast = latestGlucose + adjustment;
@@ -94,7 +104,7 @@ Respond strictly as JSON:
 {
   "forecast_mgdl": [number],
   "risk_type": "Hypo risk" | "Hyper risk" | "Stable",
-  "forecast_minutes": 30
+  "forecast_minuRisk of Hypoglycemia: tes": 30
 }
   `;
 

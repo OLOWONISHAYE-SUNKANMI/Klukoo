@@ -54,6 +54,8 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
   });
   const { toast } = useToast();
 
+  console.log('PaymentScreen Rendered');
+
   // Get plan from localStorage
   const selectedPlan = React.useMemo(() => {
     try {
@@ -72,8 +74,6 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
       selectedCountry || 'DEFAULT'
     );
   }, [selectedPlan, selectedCountry]);
-
-
 
   // Configuration AfribaPay
   // const afribaPaymentData = React.useMemo(
@@ -386,10 +386,17 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
 
               handleFlutterPayment({
                 callback: response => {
-                  console.log('Flutterwave response:', response);
-                  if (response.status === 'successful') {
+                  // console.log('Flutterwave response:', response);
+                  if (response.status === 'completed' || response.status === 'successful') {
                     setPaymentStep('success');
-                    onPaymentSuccess?.();
+                    localStorage.setItem('flw_payment_success', 'true');
+                    toast({
+                      title: 'Payment Successful!',
+                      description: 'Your subscription has been activated.',
+                    });
+                    setTimeout(() => {
+                      window.location.href = '/payment-success?flw_success=true';
+                    }, 1500);
                   } else {
                     toast({
                       title: t('paymentScreen.payment.toastErrorTitle'),
@@ -399,10 +406,10 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                       variant: 'destructive',
                     });
                   }
-                  closePaymentModal(); // close modal programmatically
+                  closePaymentModal();
                 },
                 onClose: () => {
-                  console.log('Payment closed');
+                  // console.log('Payment modal closed');
                 },
               });
             }}
