@@ -302,12 +302,58 @@ export const ProfessionalDashboard = () => {
     },
   ];
   const darkMode = theme === 'dark';
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('true');
   const [notification, setNotification] = useState('');
   const [fee, setFee] = useState('');
 
-  const handleSave = () => {
-    alert('Settings saved successfully!');
+  // Load current settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const storedCode = localStorage.getItem('professionalCode');
+        if (!storedCode) return;
+
+        const { data, error } = await supabase
+          .from('professional_applications')
+          .select('availability, notification_preferences')
+          .eq('professional_code', storedCode)
+          .single();
+
+        if (error) throw error;
+        console.log(data);
+        if (data) {
+          setStatus(data.availability ? 'true' : 'false');
+          setNotification(data.notification_preferences || '');
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+
+    if (user?.id) {
+      loadSettings();
+    }
+  }, [user?.id]);
+
+  const handleSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('professional_applications')
+        .update({
+          available: status === 'true',
+          notification_preferences: notification,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('professional_code', localStorage.getItem('professionalCode'));
+
+      console.log(error);
+      if (error) throw error;
+
+      toast.success('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings. Please try again.');
+    }
   };
 
   const handleCancel = () => {
@@ -784,10 +830,10 @@ export const ProfessionalDashboard = () => {
 
                 {/* === Form === */}
                 <form className="space-y-5">
-                  {/* Status */}
+                  {/* Availability */}
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Status
+                      Availability
                     </label>
                     <select
                       className={`w-full rounded-md px-3 py-2 text-sm focus:outline-none ${
@@ -798,10 +844,8 @@ export const ProfessionalDashboard = () => {
                       value={status}
                       onChange={e => setStatus(e.target.value)}
                     >
-                      <option value="">Select status</option>
-                      <option value="available">Available</option>
-                      <option value="busy">Busy</option>
-                      <option value="offline">Offline</option>
+                      <option value="true">Available</option>
+                      <option value="false">Not Available</option>
                     </select>
                   </div>
 
@@ -827,7 +871,7 @@ export const ProfessionalDashboard = () => {
                   </div>
 
                   {/* Consultation Fee */}
-                  <div>
+                  {/* <div>
                     <label className="block text-sm font-medium mb-2">
                       Consultation Fee (XOF)
                     </label>
@@ -842,7 +886,7 @@ export const ProfessionalDashboard = () => {
                       value={fee}
                       onChange={e => setFee(e.target.value)}
                     />
-                  </div>
+                  </div> */}
                 </form>
               </CardContent>
 

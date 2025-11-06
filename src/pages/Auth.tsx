@@ -1089,9 +1089,10 @@ const AuthPage = () => {
                           phone: e.target.value,
                         }))
                       }
+                      className="text-center text-lg font-mono"
                       required
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-center text-muted-foreground">
                       Enter the phone number the patient used when adding you
                     </p>
                   </div>

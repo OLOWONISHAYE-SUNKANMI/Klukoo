@@ -1,7 +1,7 @@
-import PredictiveAlertScreen from "@/components/screens/PredictiveAlertScreen";
-import { set } from "date-fns";
-import { P } from "node_modules/framer-motion/dist/types.d-Cjd591yU";
-import { permission } from "process";
+import PredictiveAlertScreen from '@/components/screens/PredictiveAlertScreen';
+import { set } from 'date-fns';
+import { P } from 'node_modules/framer-motion/dist/types.d-Cjd591yU';
+import { permission } from 'process';
 
 export const en = {
   // App general
@@ -507,9 +507,10 @@ export const en = {
 
   booklet: {
     downloadGuideTitle: 'Diabetes Guide',
-    downloadGuideDescription: 'Download the Diabates guide in your preferred language:',
+    downloadGuideDescription:
+      'Download the Diabates guide in your preferred language:',
     downloadFrench: 'Download in French',
-    downloadEnglish: 'Download in English',   
+    downloadEnglish: 'Download in English',
   },
 
   // Chat Screen
@@ -809,7 +810,7 @@ export const en = {
     addActivity: 'Add Activity',
     reminders: 'Add Reminders',
     glucoseSaved: 'Blood sugar saved',
-    mealSaved: 'Meal saved', 
+    mealSaved: 'Meal saved',
     medicationSaved: 'Medication saved',
     actionsPopover: {
       bloodSugar: {
@@ -1227,7 +1228,7 @@ export const en = {
     copyDescription: 'The access code has been copied to your clipboard.',
   },
 
-  // Invite Partner Modal 
+  // Invite Partner Modal
   invitePartnerModal: {
     title: 'Invite a Care Partner',
     form: {
@@ -1244,7 +1245,7 @@ export const en = {
     button2: 'Send Code',
   },
 
-   manageAccessModal: {
+  manageAccessModal: {
     title: 'Manage Access',
     radio1: 'Read only',
     radio2: 'Full Access',
@@ -1276,7 +1277,7 @@ export const en = {
     stats: {
       title1: 'Active Patients',
       title2: 'Upcoming Appointments',
-      title3: 'Reports Completed',
+      title3: 'Consultation Completed',
       title4: 'Average time / consultation',
       compared: 'vs last month',
     },
@@ -1702,8 +1703,10 @@ export const en = {
       '• Patient code automatically generated after payment',
     cancel: 'Cancel',
     continue: 'Continue',
-    patient_description: 'Individuals living with diabetes (Type 1 or Type 2) who want continous, personalized monitoring.',
-    family_description: 'Families managing diabetes together, especially for children or multiple diabetic members.',
+    patient_description:
+      'Individuals living with diabetes (Type 1 or Type 2) who want continous, personalized monitoring.',
+    family_description:
+      'Families managing diabetes together, especially for children or multiple diabetic members.',
     includeFeatures: 'Included Features:',
     patientFeatures: {
       predictiveAlert: 'AI predictive alert',
@@ -1713,7 +1716,7 @@ export const en = {
       chat: 'Klukoo Chat',
       blog: 'Klukoo News & Education Hub',
       reminder: 'Medication & Insulin Reminders',
-      mood: 'Daily Mood & Activity Log'
+      mood: 'Daily Mood & Activity Log',
     },
     familyFeatures: {
       allFeatures: 'All features from Klukoo Patient',
@@ -1723,8 +1726,8 @@ export const en = {
       family: 'TeleMedicine for Family',
       coaching: 'Family Coaching',
       support: 'Priority Medical Support',
-      report: 'Monthly Progress Report'         
-    }
+      report: 'Monthly Progress Report',
+    },
   },
 
   professionalCodeManager: {
@@ -2352,7 +2355,7 @@ The Klukoo AI app will be the first to integrate this technology by September 20
       earnings: 'Earnings',
       patients: 'Patients',
       access_codes: 'Access Codes',
-      settings: 'Settings', 
+      settings: 'Settings',
     },
     labels: {
       patients_tracked: 'Patients Tracked',
@@ -2637,12 +2640,11 @@ Failure to comply with this charter may result in temporary or permanent suspens
     paymentMethods: {
       title: 'Accepted Payment Methods',
       mobileMoney: '📱 Mobile Money (MTN, Airtel, M-Pesa, etc.)',
-      cardPayments : '💳 Card Payments (Visa, Mastercard, Verve)',
+      cardPayments: '💳 Card Payments (Visa, Mastercard, Verve)',
       bankTransfers: '🏦 Bank Transfers',
       ussd: '🔢 USSD',
       barter: '💲 Barter by Flutterwave',
-      paypal: '🌍 PayPal (via Flutterwave)'
-     
+      paypal: '🌍 PayPal (via Flutterwave)',
     },
     subscriptionInfo: {
       securePayment: 'Secure payment • Cancel anytime',
@@ -5503,7 +5505,7 @@ Failure to comply with this charter may result in temporary or permanent suspens
   predictiveAlertHeader: {
     title: 'Predictive Alert',
   },
-  
+
   predictiveAlertScreenFixes: {
     predictiveAlert: {
       title: 'Predictive Alert!',
@@ -5547,7 +5549,6 @@ Failure to comply with this charter may result in temporary or permanent suspens
       dismissAria: 'Dismiss',
       loading: 'Loading...',
       moreInfo: 'More info',
-
     },
     aiSummary: {
       error: 'Error getting summary.',

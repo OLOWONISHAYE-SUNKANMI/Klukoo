@@ -387,7 +387,10 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
               handleFlutterPayment({
                 callback: response => {
                   // console.log('Flutterwave response:', response);
-                  if (response.status === 'completed' || response.status === 'successful') {
+                  if (
+                    response.status === 'completed' ||
+                    response.status === 'successful'
+                  ) {
                     setPaymentStep('success');
                     localStorage.setItem('flw_payment_success', 'true');
                     toast({
@@ -395,7 +398,8 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({
                       description: 'Your subscription has been activated.',
                     });
                     setTimeout(() => {
-                      window.location.href = '/payment-success?flw_success=true';
+                      window.location.href =
+                        '/payment-success?flw_success=true';
                     }, 1500);
                   } else {
                     toast({
