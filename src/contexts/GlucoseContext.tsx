@@ -40,10 +40,14 @@ export const GlucoseProvider: React.FC<{ children: ReactNode }> = ({
       if (!user) return;
       setLoading(true);
 
+      // Check if in family mode to use patient's user_id
+      const familySession = JSON.parse(localStorage.getItem('family_session') || '{}');
+      const targetUserId = familySession.patient_user_id || user.id;
+
       const { data, error } = await supabase
         .from('glucose_readings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .order('timestamp', { ascending: false });
 
       if (error) {
